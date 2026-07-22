@@ -1,1 +1,139 @@
+# ─────────────────────────────
+# 운영체제
+# ─────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
 
+# ─────────────────────────────
+# IDE 및 편집기 개인 설정
+# ─────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.history/
+
+# ─────────────────────────────
+# Python
+# ─────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Python 가상환경
+.venv/
+venv/
+env/
+
+# Python 패키징
+*.egg-info/
+dist/
+build/
+
+# ─────────────────────────────
+# ROS2 / colcon
+# ─────────────────────────────
+jetson_ws/build/
+jetson_ws/install/
+jetson_ws/log/
+
+# ROS bag 및 실행 로그
+*.bag
+*.bag.active
+*.db3
+*.mcap
+rosbag2_*/
+logs/
+*.log
+
+# ─────────────────────────────
+# AI 모델 및 데이터셋
+# ─────────────────────────────
+*.pt
+*.pth
+*.onnx
+*.engine
+*.weights
+datasets/
+dataset/
+recordings/
+videos/
+
+# 단, 필요하면 작은 모델 설정은 추적
+!config/*.yaml
+!config/*.json
+
+# ─────────────────────────────
+# STM32CubeIDE
+# ─────────────────────────────
+stm32/Debug/
+stm32/Release/
+stm32/.settings/
+stm32/.metadata/
+stm32/*.launch
+
+# 컴파일 결과
+*.o
+*.obj
+*.d
+*.elf
+*.hex
+*.bin
+*.map
+*.list
+*.su
+
+# ─────────────────────────────
+# C / C++
+# ─────────────────────────────
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# ─────────────────────────────
+# C# / Visual Studio
+# ─────────────────────────────
+monitoring/.vs/
+monitoring/**/bin/
+monitoring/**/obj/
+*.user
+*.suo
+*.userprefs
+
+# ─────────────────────────────
+# 환경변수·비밀정보
+# ─────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials/
+
+# ─────────────────────────────
+# 임시 파일
+# ─────────────────────────────
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# ─────────────────────────────
+# 대용량 결과물
+# ─────────────────────────────
+*.mp4
+*.mov
+*.avi
+*.zip
+*.tar
+*.tar.gz
