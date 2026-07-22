@@ -698,3 +698,677 @@ Role: 상태 관제, 로그, TTS
 ## License
 
 본 저장소의 라이선스와 외부 라이브러리·모델의 사용 조건은 추후 확정한다.
+
+---
+
+## 설치 및 실행
+
+이 프로젝트는 GitHub에서 소스코드를 내려받은 후 Jetson 개발환경을 구성하고, ROS2 작업공간을 빌드하여 실행한다.
+
+전체 과정은 다음과 같다.
+
+```text
+GitHub 저장소 Clone
+→ Jetson 개발환경 설정
+→ 프로젝트 의존성 설치
+→ ROS2 작업공간 빌드
+→ 하드웨어 연결 상태 확인
+→ 시뮬레이션 또는 실제 로봇 실행
+```
+
+> `git clone`은 프로젝트 소스코드와 설정 파일을 내려받는 작업이다. Ubuntu, ROS2, JetPack, 센서 드라이버, Python 패키지 및 STM32 펌웨어는 별도로 설치하거나 빌드해야 한다.
+
+---
+
+### 1. 사전 요구사항
+
+#### Jetson
+
+- NVIDIA Jetson Orin Nano Super
+- JetPack이 설치된 Ubuntu
+- ROS2
+- Python 3
+- Git
+- `colcon`
+- LiDAR 및 RGB-D 카메라 드라이버
+- USB-UART 또는 CAN 인터페이스
+
+#### STM32
+
+- STM32CubeIDE
+- ST-Link
+- 프로젝트에서 사용하는 STM32 보드
+- VESC 및 BLDC 모터 드라이버
+- Cliff·ToF·IMU·햅틱 장치
+
+정확한 운영체제, ROS2 배포판, JetPack 및 Python 버전은 개발환경이 확정된 후 아래에 기록한다.
+
+| 항목 | 버전 |
+|---|---|
+| Ubuntu | 추후 작성 |
+| JetPack | 추후 작성 |
+| ROS2 | 추후 작성 |
+| Python | 추후 작성 |
+| CUDA | 추후 작성 |
+| OpenCV | 추후 작성 |
+| YOLO | 추후 작성 |
+| STM32CubeIDE | 추후 작성 |
+
+---
+
+### 2. GitHub 저장소 내려받기
+
+HTTPS 방식:
+
+```bash
+git clone https://github.com/<organization>/<repository>.git
+cd <repository>
+```
+
+SSH 키가 GitHub에 등록되어 있다면 SSH 방식도 사용할 수 있다.
+
+```bash
+git clone git@github.com:<organization>/<repository>.git
+cd <repository>
+```
+
+예시:
+
+```bash
+git clone https://github.com/kookmin-robotics/guide-amr.git
+cd guide-amr
+```
+
+실제 저장소 주소가 확정되면 위 주소를 수정한다.
+
+---
+
+### 3. 개발 브랜치 선택
+
+검증된 최종 버전은 `main`, 현재 개발 중인 통합 버전은 `develop` 브랜치를 사용한다.
+
+안정 버전 실행:
+
+```bash
+git switch main
+```
+
+개발 버전 실행:
+
+```bash
+git switch develop
+```
+
+원격 저장소의 최신 내용을 반영한다.
+
+```bash
+git pull origin main
+```
+
+또는:
+
+```bash
+git pull origin develop
+```
+
+실제 로봇 시연에는 기능 개발 브랜치보다 검증된 `main` 브랜치 또는 별도의 릴리스 태그 사용을 권장한다.
+
+---
+
+### 4. 최초 개발환경 설정
+
+저장소를 처음 내려받은 후 다음 스크립트를 실행한다.
+
+```bash
+chmod +x scripts/*.sh
+./scripts/setup_jetson.sh
+```
+
+`setup_jetson.sh`는 다음 작업을 담당한다.
+
+- 필수 프로그램 확인
+- Python 가상환경 생성
+- Python 패키지 설치
+- ROS2 의존성 설치
+- 시리얼 통신 권한 확인
+- LiDAR·카메라 드라이버 확인
+- YOLO 모델 파일 확인
+- 필수 설정 파일 생성 안내
+
+환경 설정은 Jetson 한 대당 최초 한 번만 실행하면 된다. 의존성 목록이 변경된 경우 다시 실행할 수 있다.
+
+스크립트가 아직 준비되지 않았다면 수동으로 Python 의존성을 설치한다.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install -r requirements.txt
+```
+
+ROS2 패키지 의존성을 설치한다.
+
+```bash
+source /opt/ros/<ROS_DISTRO>/setup.bash
+
+rosdep install \
+  --from-paths jetson_ws/src \
+  --ignore-src \
+  --rosdistro <ROS_DISTRO> \
+  -y
+```
+
+`<ROS_DISTRO>`는 실제 사용하는 ROS2 배포판 이름으로 변경한다.
+
+---
+
+### 5. 로컬 장치 설정
+
+팀원이나 Jetson마다 시리얼 포트와 카메라 장치 이름이 다를 수 있으므로 개인 장치 설정은 별도 파일로 관리한다.
+
+예시 설정 파일을 복사한다.
+
+```bash
+cp config/local.example.yaml config/local.yaml
+```
+
+`config/local.yaml`을 현재 장비에 맞게 수정한다.
+
+```yaml
+serial:
+  port: /dev/ttyUSB0
+  baudrate: 115200
+  timeout_ms: 300
+
+camera:
+  device: /dev/video0
+
+robot:
+  hardware_enabled: false
+```
+
+`config/local.yaml`은 개인 장치 설정이므로 GitHub에 올리지 않는다.
+
+```gitignore
+config/local.yaml
+```
+
+시리얼 장치를 확인한다.
+
+```bash
+ls /dev/ttyUSB*
+ls /dev/ttyACM*
+```
+
+현재 사용자가 시리얼 포트에 접근할 수 없는 경우 시스템 설정에 따라 권한을 추가해야 할 수 있다.
+
+---
+
+### 6. YOLO 모델 준비
+
+YOLO 모델은 파일 크기가 클 수 있으므로 일반 Git 저장소에서 제외할 수 있다.
+
+모델 파일은 다음 위치에 배치한다.
+
+```text
+models/
+└── obstacle_detector.engine
+```
+
+또는 개발 단계에서는 다음과 같은 모델을 사용할 수 있다.
+
+```text
+models/
+├── obstacle_detector.pt
+├── obstacle_detector.onnx
+└── obstacle_detector.engine
+```
+
+모델 파일이 없다면 설치 스크립트 또는 프로젝트에서 지정한 배포 위치를 통해 내려받는다.
+
+```bash
+./scripts/download_models.sh
+```
+
+모델이 없거나 Jetson과 호환되지 않는 경우 로봇이 주행을 시작하지 않고 오류를 표시해야 한다.
+
+---
+
+### 7. Jetson ROS2 작업공간 빌드
+
+빌드 스크립트를 사용한다.
+
+```bash
+./scripts/build_jetson.sh
+```
+
+수동으로 빌드할 경우:
+
+```bash
+source /opt/ros/<ROS_DISTRO>/setup.bash
+cd jetson_ws
+colcon build --symlink-install
+source install/setup.bash
+cd ..
+```
+
+빌드가 끝난 후 다음 폴더가 생성된다.
+
+```text
+jetson_ws/build/
+jetson_ws/install/
+jetson_ws/log/
+```
+
+위 폴더는 자동 생성 파일이므로 GitHub에 올리지 않는다.
+
+---
+
+### 8. STM32 펌웨어 빌드 및 업로드
+
+Jetson 저장소를 `clone`하더라도 STM32 펌웨어가 MCU에 자동으로 기록되지는 않는다.
+
+STM32CubeIDE를 이용하는 경우:
+
+```text
+1. STM32CubeIDE 실행
+2. stm32/ 프로젝트 열기
+3. 프로젝트 Build
+4. ST-Link 연결
+5. STM32에 펌웨어 업로드
+6. 시리얼 통신 및 센서 상태 확인
+```
+
+명령행 빌드·업로드 스크립트가 준비된 경우:
+
+```bash
+./scripts/build_firmware.sh
+./scripts/flash_firmware.sh
+```
+
+펌웨어 업로드는 실제 하드웨어를 변경하므로 자동 실행하지 않는다. 업로드 전 대상 MCU, 보드 연결 및 펌웨어 버전을 확인해야 한다.
+
+Jetson 소프트웨어와 STM32 펌웨어는 동일한 통신 규격 버전을 사용해야 한다.
+
+```text
+Jetson protocol version == STM32 protocol version
+```
+
+버전이 다르면 모터 주행을 허용하지 않는다.
+
+---
+
+### 9. 시뮬레이션 실행
+
+실제 모터를 연결하기 전에 시뮬레이션 또는 가상 센서 환경에서 먼저 확인한다.
+
+```bash
+./scripts/run_simulation.sh
+```
+
+또는 ROS2 launch 파일을 직접 실행한다.
+
+```bash
+source /opt/ros/<ROS_DISTRO>/setup.bash
+source jetson_ws/install/setup.bash
+
+ros2 launch amr_bringup simulation.launch.py
+```
+
+시뮬레이션에서 다음 항목을 확인한다.
+
+- `INIT → READY` 상태 전환
+- 정상 주행 명령 생성
+- 장애물 접근 시 감속
+- 정지거리 또는 TTC 기준 충족 시 정지
+- 가상 Cliff 입력 시 긴급정지
+- 통신 단절 시 긴급정지
+- 긴급정지 후 자동 재출발 금지
+- 햅틱 명령 및 TTS 이벤트 생성
+- 상태와 오류 로그 저장
+
+---
+
+### 10. 하드웨어 연결 상태 확인
+
+실제 로봇 실행 전 하드웨어 점검 스크립트를 실행한다.
+
+```bash
+./scripts/check_hardware.sh
+```
+
+점검 항목:
+
+- [ ] STM32 통신 연결
+- [ ] Jetson–STM32 통신 규격 버전 일치
+- [ ] E-Stop 해제 상태
+- [ ] Cliff 센서 정상
+- [ ] ToF 센서 정상
+- [ ] LiDAR 데이터 수신
+- [ ] RGB-D 카메라 데이터 수신
+- [ ] IMU 및 엔코더 데이터 수신
+- [ ] VESC 오류 없음
+- [ ] 좌우 모터 목표속도 0
+- [ ] 배터리 전압 정상
+- [ ] 햅틱 장치 연결
+- [ ] TTS 스피커 연결
+- [ ] 현재 안전 상태 `READY`
+- [ ] 사용자 또는 시험 담당자가 E-Stop에 접근 가능
+
+필수 점검 항목 중 하나라도 실패하면 모터를 활성화하지 않는다.
+
+---
+
+### 11. 실제 로봇 실행
+
+> 실제 로봇은 시뮬레이션 시험과 하드웨어 점검을 통과한 뒤 통제된 환경에서 실행한다.
+
+전체 시스템 실행:
+
+```bash
+./scripts/run_robot.sh --mode hardware
+```
+
+또는 ROS2 launch 파일을 직접 실행한다.
+
+```bash
+source /opt/ros/<ROS_DISTRO>/setup.bash
+source jetson_ws/install/setup.bash
+
+ros2 launch amr_bringup robot.launch.py \
+  mode:=hardware \
+  config_file:=config/local.yaml
+```
+
+실행 순서:
+
+```text
+1. E-Stop 작동 상태에서 전원 인가
+2. Jetson·STM32·센서 부팅
+3. 전체 소프트웨어 실행
+4. 시스템 자체 점검
+5. 모터 목표속도가 0인지 확인
+6. E-Stop 해제
+7. 시스템 상태 READY 확인
+8. 사용자 주행 허가 입력
+9. 가장 낮은 속도로 출발
+```
+
+실제 하드웨어 실행 모드는 사용자가 명시적으로 `hardware`를 지정해야 한다. 옵션을 생략한 경우 기본 모드는 `simulation` 또는 `motor_disabled`로 설정한다.
+
+---
+
+### 12. 시스템 종료
+
+정상 종료:
+
+```bash
+./scripts/stop_robot.sh
+```
+
+권장 종료 순서:
+
+```text
+1. 목표속도 0 전송
+2. 실제 바퀴 속도 0 확인
+3. 시스템 상태 READY 또는 CONTROLLED_STOP 확인
+4. 모터 출력 비활성화
+5. ROS2 노드 종료
+6. 센서 및 Jetson 종료
+7. 필요 시 E-Stop 작동
+8. 메인 전원 차단
+```
+
+프로그램 창만 강제 종료해 모터 제어 명령이 불명확하게 남지 않도록 한다. 통신이 단절되면 STM32 Watchdog이 정지 명령을 발생시켜야 한다.
+
+---
+
+### 13. 실행 로그
+
+실행 로그는 다음 위치에 저장한다.
+
+```text
+logs/
+├── system/
+├── safety/
+├── communication/
+└── rosbag/
+```
+
+로그에는 최소한 다음 정보가 포함되어야 한다.
+
+- 실행 시작 시간
+- 소프트웨어 및 통신 규격 버전
+- 안전 상태 변화
+- 상태 변화 원인
+- 장애물 거리와 TTC
+- Cliff·ToF 감지 결과
+- 목표속도와 실제속도
+- 통신 오류
+- 모터 및 센서 오류
+- 긴급정지 원인
+- 사용자 리셋 시점
+
+로그와 ROS bag은 용량이 크므로 기본적으로 GitHub에 올리지 않는다.
+
+---
+
+### 14. 최신 코드로 업데이트
+
+원격 저장소의 최신 코드를 받기 전에 현재 브랜치와 수정 상태를 확인한다.
+
+```bash
+git status
+git branch --show-current
+```
+
+최신 코드를 내려받는다.
+
+```bash
+git pull origin develop
+```
+
+의존성이나 ROS2 패키지가 변경되었다면 다시 설치하고 빌드한다.
+
+```bash
+./scripts/setup_jetson.sh
+./scripts/build_jetson.sh
+```
+
+업데이트 후에는 바로 실제 로봇을 실행하지 않고 먼저 테스트한다.
+
+```bash
+./scripts/run_tests.sh
+./scripts/run_simulation.sh
+./scripts/check_hardware.sh
+```
+
+그다음 실제 로봇을 실행한다.
+
+```bash
+./scripts/run_robot.sh --mode hardware
+```
+
+---
+
+### 15. 권장 전체 실행 순서
+
+#### 최초 설치
+
+```bash
+git clone https://github.com/<organization>/<repository>.git
+cd <repository>
+
+chmod +x scripts/*.sh
+cp config/local.example.yaml config/local.yaml
+
+./scripts/setup_jetson.sh
+./scripts/build_jetson.sh
+./scripts/run_tests.sh
+./scripts/run_simulation.sh
+```
+
+#### 이후 일반 실행
+
+```bash
+cd <repository>
+
+git pull origin main
+./scripts/build_jetson.sh
+./scripts/check_hardware.sh
+./scripts/run_robot.sh --mode hardware
+```
+
+#### 개발 버전 시험
+
+```bash
+cd <repository>
+
+git switch develop
+git pull origin develop
+
+./scripts/build_jetson.sh
+./scripts/run_tests.sh
+./scripts/run_simulation.sh
+```
+
+---
+
+### 16. 문제 해결
+
+#### 시리얼 포트를 찾을 수 없는 경우
+
+```bash
+ls /dev/ttyUSB*
+ls /dev/ttyACM*
+```
+
+확인 사항:
+
+- USB 케이블 연결
+- STM32 전원
+- 장치 포트 이름
+- 사용자 접근 권한
+- 다른 프로그램의 포트 점유 여부
+
+#### ROS2 패키지를 찾을 수 없는 경우
+
+```bash
+source /opt/ros/<ROS_DISTRO>/setup.bash
+source jetson_ws/install/setup.bash
+```
+
+빌드가 완료되지 않았다면:
+
+```bash
+./scripts/build_jetson.sh
+```
+
+#### Python 패키지를 찾을 수 없는 경우
+
+```bash
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+#### YOLO 모델을 찾을 수 없는 경우
+
+```bash
+ls models/
+./scripts/download_models.sh
+```
+
+모델 파일 경로가 설정 파일과 일치하는지 확인한다.
+
+#### STM32 통신은 연결됐지만 명령이 적용되지 않는 경우
+
+확인 사항:
+
+- 통신 규격 버전
+- 보레이트
+- CRC 방식
+- Little-endian 설정
+- Heartbeat 수신 여부
+- `Drive Enable` 상태
+- E-Stop 상태
+- Cliff 센서 상태
+- 현재 `FAULT` 여부
+- 재출발 확인 절차
+
+#### 로봇이 `READY`로 전환되지 않는 경우
+
+관제 화면 또는 로그에서 안전 플래그를 확인한다.
+
+```text
+ESTOP_ACTIVE
+CLIFF_DETECTED
+TOF_INVALID
+COMM_TIMEOUT
+MOTOR_FAULT
+ENCODER_FAULT
+LOW_BATTERY
+SENSOR_TIMEOUT
+PROTOCOL_MISMATCH
+```
+
+원인을 해결한 뒤 로봇이 완전히 정지한 상태에서 수동 리셋을 수행한다.
+
+---
+
+### 17. 배포 버전 사용
+
+최종 시연이나 안정성 시험에는 개발 중인 최신 커밋보다 검증된 릴리스 태그 사용을 권장한다.
+
+릴리스 목록 확인:
+
+```bash
+git tag
+```
+
+특정 버전 선택:
+
+```bash
+git switch --detach v1.0-final
+```
+
+다시 `main` 브랜치로 돌아가기:
+
+```bash
+git switch main
+```
+
+예정 태그:
+
+```text
+v0.1-week1-protocol
+v0.2-week2-safety
+v0.3-week3-integration
+v0.4-week4-demo
+v1.0-final
+```
+
+각 태그에는 다음 정보를 기록한다.
+
+- 주요 구현 기능
+- 필요한 STM32 펌웨어 버전
+- 통신 규격 버전
+- 테스트 결과
+- 알려진 문제
+- 실행 가능한 하드웨어 구성
+
+---
+
+### 18. 안전 주의사항
+
+이 프로젝트는 연구·교육 목적의 프로토타입이다. 실제 시각장애인의 독립 보행을 보장하는 인증된 상용 안전 장비가 아니다.
+
+- 실제 로봇 실행 전 반드시 시뮬레이션을 수행한다.
+- 최초 모터 시험은 바퀴를 지면에서 띄운 상태로 진행한다.
+- 이동 시험은 가장 낮은 속도로 시작한다.
+- 실제 계단이나 승강장 끝에서 초기 시험하지 않는다.
+- 낙차 시험은 안전하게 제작된 모형에서 수행한다.
+- 테스트 구역에 안전요원을 배치한다.
+- 시험 담당자는 언제든 E-Stop을 작동할 수 있어야 한다.
+- `EMERGENCY_STOP`과 `FAULT` 이후 자동 재출발을 금지한다.
+- 실제 하드웨어 모드는 명시적인 사용자 입력 없이 활성화하지 않는다.
+- 센서 또는 통신 상태를 신뢰할 수 없으면 주행하지 않는다.
