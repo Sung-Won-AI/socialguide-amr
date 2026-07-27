@@ -56,3 +56,13 @@ class HapticPattern(IntEnum):
     STOP = 5
     EMERGENCY = 6
     FAULT = 7
+
+
+class DriveControlFlag(IntFlag):
+    NONE = 0
+    DRIVE_ENABLE = 1 << 0
+    CONTROLLED_STOP = 1 << 1
+    NAVIGATION_ACTIVE = 1 << 2
+    MANUAL_MODE = 1 << 3
+    RESET_REQUEST = 1 << 4
+    SLOW_MODE = 1 << 5
