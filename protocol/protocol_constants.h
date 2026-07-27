@@ -44,4 +44,15 @@ typedef enum {
     AMR_SAFETY_PROTOCOL_MISMATCH = 1U << 11
 } AmrSafetyFlag;
 
+typedef enum {
+    AMR_DRIVE_NONE            = 0,
+    AMR_DRIVE_ENABLE          = 1U << 0,
+    AMR_DRIVE_CONTROLLED_STOP = 1U << 1,
+    AMR_DRIVE_NAV_ACTIVE      = 1U << 2,
+    AMR_DRIVE_MANUAL_MODE     = 1U << 3,
+    AMR_DRIVE_RESET_REQUEST   = 1U << 4,
+    AMR_DRIVE_SLOW_MODE       = 1U << 5
+} AmrDriveControlFlag;
+
 #endif
+
