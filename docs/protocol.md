@@ -1,4 +1,4 @@
-Jetson–STM32 통신 규격 초안
+# Jetson–STM32 통신 규격 초안
 
 상태: Draft  
 프로토콜 버전: 1
@@ -30,6 +30,21 @@ Payload 형식: `<HhhHBB`
 | control_flags | uint8 | bit field |
 | reserved | uint8 | - |
 
+### DRIVE_COMMAND control flags
+
+| Bit | 이름 | 설명 |
+|---:|---|---|
+| 0 | DRIVE_ENABLE | STM32에 주행 허가 요청 |
+| 1 | CONTROLLED_STOP | 일반 감속 정지 요청 |
+| 2 | NAVIGATION_ACTIVE | 자율 경로 주행 활성 |
+| 3 | MANUAL_MODE | 수동 시험 모드 |
+| 4 | RESET_REQUEST | 위험 해제 후 수동 리셋 |
+| 5 | SLOW_MODE | 감속 상태 및 속도 제한 적용 |
+
+`RESET_REQUEST`가 포함된 패킷은 주행 명령을 동시에 수행하지 않는다. STM32는
+위험 조건이 모두 해제된 경우에만 READY로 전환하고, 이후 별도의
+`DRIVE_ENABLE` 패킷을 받아야 주행한다.
+
 ## ROBOT_STATUS
 
 Payload 형식: `<BHhhHHHHI`
@@ -52,5 +67,3 @@ Payload 형식: `<BHhhHHHHI`
 - 마지막 유효 주행 명령 이후 300ms가 지나면 STM32가 정지한다.
 - 통신이 복구돼도 자동으로 재출발하지 않는다.
 - Cliff, E-Stop 및 STM32 고장은 Jetson 명령보다 우선한다.
-
-
