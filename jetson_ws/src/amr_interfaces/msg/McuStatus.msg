@@ -1,0 +1,12 @@
+builtin_interfaces/Time stamp
+uint8 system_state
+uint16 safety_flags
+float32 left_velocity_mps
+float32 right_velocity_mps
+float32 battery_voltage_v
+uint16 motor_error
+uint16 last_command_id
+uint16 rx_error_count
+uint32 uptime_ms
+bool connected
+bool dummy
