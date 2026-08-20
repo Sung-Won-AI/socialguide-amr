@@ -19,3 +19,6 @@ python3 -m unittest discover -s tests -v
 - 메모리 전송 및 통신 브리지 timeout
 - 가상 STM32 독립 안전정지
 - 정상→감속→정지→리셋→Cliff 통합 시나리오
+- ROS2 Dummy 시나리오·LiDAR·IMU 생성기
+- 센서 timeout 및 ROS2 입력 변환
+- ROS2 상태의 관제 API 변환
