@@ -42,6 +42,7 @@ void AppIntegration_Init(void)
 {
     const AmrMotorConfig motor_config = {
         AMR_WHEEL_BASE_MM,
+        AMR_WHEEL_DIAMETER_MM,
         AMR_MAXIMUM_WHEEL_SPEED_MM_S,
         AMR_SLOW_WHEEL_SPEED_MM_S,
         AMR_ALLOW_REVERSE != 0
