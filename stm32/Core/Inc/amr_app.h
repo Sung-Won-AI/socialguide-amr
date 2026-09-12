@@ -26,6 +26,10 @@ typedef struct {
     uint16_t ultrasonic_front_mm;
     uint16_t sharp_left_mm;
     uint16_t sharp_right_mm;
+    bool push_switch_pressed;
+    int16_t requested_base_rpm;
+    int16_t measured_left_velocity_rpm;
+    int16_t measured_right_velocity_rpm;
 } AmrHardwareInputs;
 
 typedef struct {
@@ -34,9 +38,11 @@ typedef struct {
     AmrCommandWatchdog watchdog;
     AmrMotorConfig motor_config;
     AmrDriveCommand last_command;
+    AmrWheelCommand last_wheel_command;
     AmrMotorTargets motor_targets;
     AmrRobotStatus status;
     bool has_valid_command;
+    bool has_valid_wheel_command;
     uint8_t tx_sequence;
 } AmrApp;
 
