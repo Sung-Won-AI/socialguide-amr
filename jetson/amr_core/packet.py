@@ -50,11 +50,14 @@ class RobotStatus:
     last_command_id: int
     rx_error_count: int
     uptime_ms: int
+    ultrasonic_front_mm: int = 0xFFFF
+    sharp_left_mm: int = 0xFFFF
+    sharp_right_mm: int = 0xFFFF
 
 
 _FRAME_HEADER = struct.Struct("<2sBBBB")
 _DRIVE_COMMAND = struct.Struct("<HhhHBB")
-_ROBOT_STATUS = struct.Struct("<BHhhHHHHI")
+_ROBOT_STATUS = struct.Struct("<BHhhHHHHIHHH")
 
 
 def encode_packet(packet: Packet) -> bytes:
@@ -179,6 +182,9 @@ def encode_robot_status(status: RobotStatus, sequence: int) -> bytes:
         status.last_command_id,
         status.rx_error_count,
         status.uptime_ms,
+        status.ultrasonic_front_mm,
+        status.sharp_left_mm,
+        status.sharp_right_mm,
     )
     return encode_packet(Packet(MessageId.ROBOT_STATUS, sequence, payload))
 
@@ -200,6 +206,9 @@ def decode_robot_status(packet: Packet) -> RobotStatus:
         last_command_id,
         rx_error_count,
         uptime_ms,
+        ultrasonic_front_mm,
+        sharp_left_mm,
+        sharp_right_mm,
     ) = values
     return RobotStatus(
         SystemState(state),
@@ -211,5 +220,7 @@ def decode_robot_status(packet: Packet) -> RobotStatus:
         last_command_id,
         rx_error_count,
         uptime_ms,
+        ultrasonic_front_mm,
+        sharp_left_mm,
+        sharp_right_mm,
     )
-
