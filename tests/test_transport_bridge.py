@@ -1,7 +1,7 @@
 import unittest
 
-from protocol.protocol_constants import SafetyFlag, SystemState
-from jetson.amr_core.packet import DriveCommand, RobotStatus, encode_robot_status
+from protocol.protocol_constants import MessageId, SafetyFlag, SystemState
+from jetson.amr_core.packet import DriveCommand, RobotStatus, WheelCommand, decode_packet, encode_robot_status
 from jetson.amr_core.serial_bridge import SerialBridge
 from jetson.amr_core.transport import memory_transport_pair
 
@@ -27,6 +27,13 @@ class SerialBridgeTests(unittest.TestCase):
         self.assertTrue(raw)
         self.assertEqual(sequence, 0)
 
+    def test_wheel_command_is_transmitted(self) -> None:
+        command = WheelCommand(2, 102, 100, 1, 0)
+        sequence = self.bridge.send_wheel_command(command)
+        packet = decode_packet(self.stm32.read())
+        self.assertEqual(sequence, 0)
+        self.assertEqual(packet.message_id, MessageId.WHEEL_COMMAND)
+
     def test_status_is_received_and_timeout_is_reported(self) -> None:
         status = RobotStatus(
             SystemState.RUN,
@@ -48,4 +55,3 @@ class SerialBridgeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
