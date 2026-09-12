@@ -210,6 +210,9 @@ size_t AmrProtocol_EncodeRobotStatus(
     write_u16_le(&payload[11], status->last_command_id);
     write_u16_le(&payload[13], status->rx_error_count);
     write_u32_le(&payload[15], status->uptime_ms);
+    write_u16_le(&payload[19], status->ultrasonic_front_mm);
+    write_u16_le(&payload[21], status->sharp_left_mm);
+    write_u16_le(&payload[23], status->sharp_right_mm);
 
     return AmrProtocol_EncodeFrame(
         AMR_MSG_ROBOT_STATUS,
