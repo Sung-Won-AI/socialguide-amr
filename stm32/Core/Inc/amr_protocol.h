@@ -10,7 +10,7 @@
 #define AMR_FRAME_OVERHEAD_SIZE 8U
 #define AMR_MAX_FRAME_SIZE (AMR_MAX_PAYLOAD_SIZE + AMR_FRAME_OVERHEAD_SIZE)
 #define AMR_DRIVE_COMMAND_PAYLOAD_SIZE 10U
-#define AMR_ROBOT_STATUS_PAYLOAD_SIZE 19U
+#define AMR_ROBOT_STATUS_PAYLOAD_SIZE 25U
 
 typedef struct {
     uint8_t version;
@@ -38,6 +38,9 @@ typedef struct {
     uint16_t last_command_id;
     uint16_t rx_error_count;
     uint32_t uptime_ms;
+    uint16_t ultrasonic_front_mm;
+    uint16_t sharp_left_mm;
+    uint16_t sharp_right_mm;
 } AmrRobotStatus;
 
 typedef enum {
