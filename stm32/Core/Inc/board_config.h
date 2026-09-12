@@ -14,8 +14,9 @@
 #define AMR_ALLOW_REVERSE                    0
 
 #define AMR_CONTROL_PERIOD_MS                10U
-#define AMR_COMMAND_TIMEOUT_MS               300U
+#define AMR_COMMAND_TIMEOUT_MS               500U
 #define AMR_STATUS_PERIOD_MS                 100U
+#define AMR_REQUESTED_BASE_RPM               30
 
 #define AMR_PWM_MAX                          8499.0f
 #define AMR_PWM_MIN                          0.0f
@@ -37,11 +38,13 @@
 #define AMR_HAS_CLIFF_RIGHT_INPUT             0
 #define AMR_HAS_HANDLE_INPUT                  0
 #define AMR_HAS_BATTERY_MONITOR               0
+#define AMR_HAS_DRIVE_SWITCH_INPUT             0
 
 /* Change these if the real circuit uses active-low logic. */
 #define AMR_ESTOP_ACTIVE_LEVEL                GPIO_PIN_SET
 #define AMR_CLIFF_ACTIVE_LEVEL                GPIO_PIN_SET
 #define AMR_HANDLE_RELEASED_LEVEL              GPIO_PIN_SET
+#define AMR_DRIVE_SWITCH_ACTIVE_LEVEL           GPIO_PIN_SET
 
 #define AMR_UART_RX_BUFFER_SIZE              256U
 
