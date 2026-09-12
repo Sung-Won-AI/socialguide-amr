@@ -13,8 +13,10 @@ from .packet import (
     DriveCommand,
     Packet,
     RobotStatus,
+    WheelCommand,
     decode_robot_status,
     encode_drive_command,
+    encode_wheel_command,
     encode_packet,
     extract_packets,
 )
@@ -56,6 +58,11 @@ class SerialBridge:
     def send_drive_command(self, command: DriveCommand) -> int:
         sequence = self._next_sequence()
         self.transport.write(encode_drive_command(command, sequence))
+        return sequence
+
+    def send_wheel_command(self, command: WheelCommand) -> int:
+        sequence = self._next_sequence()
+        self.transport.write(encode_wheel_command(command, sequence))
         return sequence
 
     def send_heartbeat(self, jetson_state: int, uptime_ms: int) -> int:
@@ -108,4 +115,3 @@ class SerialBridge:
         sequence = self._sequence
         self._sequence = (self._sequence + 1) & 0xFF
         return sequence
-
