@@ -10,6 +10,7 @@
 #include "amr_protocol.h"
 #include "amr_safety.h"
 #include "amr_watchdog.h"
+#include "range_sensors.h"
 
 static void write_u16_le(uint8_t *data, uint16_t value)
 {
@@ -59,12 +60,33 @@ static void test_crc(void)
     assert(AmrCrc16_CcittFalse(NULL, 0U) == 0xFFFFU);
 }
 
+static void test_range_sensors(void)
+{
+    static const AmrSharpCalibrationPoint calibration[] = {
+        {500U, 800U}, {1000U, 400U}, {1500U, 200U}
+    };
+    AmrRangeMedianFilter filter;
+    uint16_t distance;
+
+    distance = RangeSensors_UltrasonicPulseToMm(5831U, 200, 20U, 4000U);
+    assert(distance >= 995U);
+    assert(distance <= 1005U);
+    assert(RangeSensors_UltrasonicPulseToMm(0U, 200, 20U, 4000U)
+        == AMR_RANGE_INVALID_MM);
+    assert(RangeSensors_SharpAdcToMm(1250U, calibration, 3U) == 300U);
+
+    RangeSensors_FilterInit(&filter);
+    (void)RangeSensors_FilterUpdate(&filter, 400U);
+    (void)RangeSensors_FilterUpdate(&filter, 100U);
+    assert(RangeSensors_FilterUpdate(&filter, 300U) == 300U);
+}
+
 static void test_protocol_round_trip(void)
 {
     static const uint8_t python_reference[] = {
-        0xAAU, 0x55U, 0x01U, 0x10U, 0x07U, 0x0AU,
+        0xAAU, 0x55U, 0x02U, 0x10U, 0x07U, 0x0AU,
         0x2AU, 0x00U, 0x5EU, 0x01U, 0x88U, 0xFFU,
-        0xF4U, 0x01U, 0x01U, 0x00U, 0x61U, 0x5CU
+        0xF4U, 0x01U, 0x01U, 0x00U, 0xC2U, 0xD1U
     };
     uint8_t frame[AMR_MAX_FRAME_SIZE];
     size_t size = make_drive_frame(
@@ -219,6 +241,7 @@ static void test_app_end_to_end(void)
 int main(void)
 {
     test_crc();
+    test_range_sensors();
     test_protocol_round_trip();
     test_safety_latch();
     test_watchdog_wraparound();
