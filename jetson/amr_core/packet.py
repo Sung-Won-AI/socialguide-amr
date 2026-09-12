@@ -40,6 +40,15 @@ class DriveCommand:
 
 
 @dataclass(frozen=True)
+class WheelCommand:
+    command_id: int
+    left_target_rpm: int
+    right_target_rpm: int
+    control_flags: int
+    emergency: int = 0
+
+
+@dataclass(frozen=True)
 class RobotStatus:
     system_state: SystemState
     safety_flags: SafetyFlag
@@ -53,11 +62,16 @@ class RobotStatus:
     ultrasonic_front_mm: int = 0xFFFF
     sharp_left_mm: int = 0xFFFF
     sharp_right_mm: int = 0xFFFF
+    push_switch_pressed: int = 0
+    requested_base_rpm: int = 0
+    left_velocity_rpm: int = 0
+    right_velocity_rpm: int = 0
 
 
 _FRAME_HEADER = struct.Struct("<2sBBBB")
 _DRIVE_COMMAND = struct.Struct("<HhhHBB")
-_ROBOT_STATUS = struct.Struct("<BHhhHHHHIHHH")
+_WHEEL_COMMAND = struct.Struct("<HhhBB")
+_ROBOT_STATUS = struct.Struct("<BHhhHHHHIHHHBhhh")
 
 
 def encode_packet(packet: Packet) -> bytes:
@@ -171,6 +185,32 @@ def decode_drive_command(packet: Packet) -> DriveCommand:
     return DriveCommand(command_id, linear, angular, speed_limit, flags)
 
 
+def encode_wheel_command(command: WheelCommand, sequence: int) -> bytes:
+    if not -32768 <= command.left_target_rpm <= 32767:
+        raise PacketError("left target RPM must fit in int16")
+    if not -32768 <= command.right_target_rpm <= 32767:
+        raise PacketError("right target RPM must fit in int16")
+    if command.emergency not in (0, 1):
+        raise PacketError("emergency must be 0 or 1")
+    payload = _WHEEL_COMMAND.pack(
+        command.command_id,
+        command.left_target_rpm,
+        command.right_target_rpm,
+        command.control_flags,
+        command.emergency,
+    )
+    return encode_packet(Packet(MessageId.WHEEL_COMMAND, sequence, payload))
+
+
+def decode_wheel_command(packet: Packet) -> WheelCommand:
+    if packet.message_id != MessageId.WHEEL_COMMAND:
+        raise PacketError("not a WHEEL_COMMAND packet")
+    if len(packet.payload) != _WHEEL_COMMAND.size:
+        raise PacketError("invalid WHEEL_COMMAND payload size")
+    values = _WHEEL_COMMAND.unpack(packet.payload)
+    return WheelCommand(*values)
+
+
 def encode_robot_status(status: RobotStatus, sequence: int) -> bytes:
     payload = _ROBOT_STATUS.pack(
         int(status.system_state),
@@ -185,6 +225,10 @@ def encode_robot_status(status: RobotStatus, sequence: int) -> bytes:
         status.ultrasonic_front_mm,
         status.sharp_left_mm,
         status.sharp_right_mm,
+        status.push_switch_pressed,
+        status.requested_base_rpm,
+        status.left_velocity_rpm,
+        status.right_velocity_rpm,
     )
     return encode_packet(Packet(MessageId.ROBOT_STATUS, sequence, payload))
 
@@ -209,6 +253,10 @@ def decode_robot_status(packet: Packet) -> RobotStatus:
         ultrasonic_front_mm,
         sharp_left_mm,
         sharp_right_mm,
+        push_switch_pressed,
+        requested_base_rpm,
+        left_velocity_rpm,
+        right_velocity_rpm,
     ) = values
     return RobotStatus(
         SystemState(state),
@@ -223,4 +271,8 @@ def decode_robot_status(packet: Packet) -> RobotStatus:
         ultrasonic_front_mm,
         sharp_left_mm,
         sharp_right_mm,
+        push_switch_pressed,
+        requested_base_rpm,
+        left_velocity_rpm,
+        right_velocity_rpm,
     )
