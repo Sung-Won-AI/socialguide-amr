@@ -57,13 +57,18 @@ def default_snapshot() -> dict[str, Any]:
             "left_distance_m": None,
             "right_distance_m": None,
         },
+        "range_sensors": {
+            "ultrasonic_front_m": None,
+            "sharp_left_m": None,
+            "sharp_right_m": None,
+        },
         "battery": {
             "voltage_v": None,
             "percent": None,
             "warning": False,
         },
         "diagnostics": {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "motor_error": 0,
             "rx_error_count": 0,
             "last_command_id": 0,
@@ -184,6 +189,8 @@ class MonitoringStore:
         MonitoringStore._optional_non_negative(
             cliff["right_distance_m"], "cliff.right_distance_m"
         )
+        for name, value in snapshot["range_sensors"].items():
+            MonitoringStore._optional_non_negative(value, f"range_sensors.{name}")
 
         battery = snapshot["battery"]
         MonitoringStore._optional_non_negative(
@@ -248,4 +255,3 @@ class MonitoringStore:
         )
         if len(self._events) > self._event_limit:
             del self._events[: len(self._events) - self._event_limit]
-
