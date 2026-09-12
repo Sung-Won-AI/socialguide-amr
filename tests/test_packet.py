@@ -6,12 +6,15 @@ from jetson.amr_core.packet import (
     Packet,
     PacketError,
     RobotStatus,
+    WheelCommand,
     decode_drive_command,
     decode_packet,
     decode_robot_status,
     encode_drive_command,
     encode_packet,
     encode_robot_status,
+    encode_wheel_command,
+    decode_wheel_command,
     extract_packets,
 )
 
@@ -53,9 +56,19 @@ class PacketTests(unittest.TestCase):
             ultrasonic_front_mm=620,
             sharp_left_mm=210,
             sharp_right_mm=230,
+            push_switch_pressed=1,
+            requested_base_rpm=100,
+            left_velocity_rpm=98,
+            right_velocity_rpm=101,
         )
         packet = decode_packet(encode_robot_status(original, sequence=10))
         self.assertEqual(decode_robot_status(packet), original)
+
+    def test_wheel_command_round_trip(self) -> None:
+        original = WheelCommand(51, 102, 100, 1, 0)
+        packet = decode_packet(encode_wheel_command(original, sequence=11))
+        self.assertEqual(packet.message_id, MessageId.WHEEL_COMMAND)
+        self.assertEqual(decode_wheel_command(packet), original)
 
     def test_stream_parser_recovers_after_noise_and_bad_frame(self) -> None:
         bad = bytearray(encode_packet(Packet(MessageId.HEARTBEAT, 1, b"bad")))
