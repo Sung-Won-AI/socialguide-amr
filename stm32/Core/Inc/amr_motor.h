@@ -8,6 +8,7 @@
 
 typedef struct {
     uint16_t wheel_base_mm;
+    float wheel_diameter_mm;
     uint16_t maximum_wheel_speed_mm_s;
     uint16_t slow_wheel_speed_mm_s;
     bool allow_reverse;
@@ -22,6 +23,13 @@ void AmrMotor_ComputeTargets(
     const AmrMotorConfig *config,
     const AmrSafetyManager *safety,
     const AmrDriveCommand *command,
+    AmrMotorTargets *targets_out
+);
+
+void AmrMotor_ComputeWheelRpmTargets(
+    const AmrMotorConfig *config,
+    const AmrSafetyManager *safety,
+    const AmrWheelCommand *command,
     AmrMotorTargets *targets_out
 );
 
