@@ -48,10 +48,12 @@ class PathGuidanceNode(Node):
         self.lidar_stamp = 0.0
         self.left_velocity: float | None = None
         self.right_velocity: float | None = None
+        self.requested_speed_mps: float | None = None
         self.publisher = self.create_publisher(Twist, "/cmd_vel_raw", 10)
         self.create_subscription(Float32, "/camera/path_error", self._on_camera, 10)
         self.create_subscription(LaserScan, "/scan", self._on_scan, qos_profile_sensor_data)
         self.create_subscription(McuStatus, "/mcu/status", self._on_mcu, 10)
+        self.create_subscription(Float32, "/drive/base_speed_mps", self._on_base_speed, 10)
         self.create_timer(0.05, self._tick)
 
     def now_s(self) -> float:
@@ -89,10 +91,12 @@ class PathGuidanceNode(Node):
             self.left_velocity = float(message.left_velocity_mps)
             self.right_velocity = float(message.right_velocity_mps)
 
+    def _on_base_speed(self, message: Float32) -> None:
+        self.requested_speed_mps = max(0.0, float(message.data))
+
     def _tick(self) -> None:
         message = Twist()
         if not bool(self.get_parameter("enabled").value):
-            self.publisher.publish(message)
             return
         now = self.now_s()
         timeout = float(self.get_parameter("command_timeout_s").value)
@@ -108,7 +112,11 @@ class PathGuidanceNode(Node):
         if inputs.camera_lateral_error is None and inputs.lidar_lateral_error_m is None:
             self.publisher.publish(message)
             return
-        message.linear.x = command.linear_mps
+        message.linear.x = (
+            self.requested_speed_mps
+            if self.requested_speed_mps is not None
+            else command.linear_mps
+        )
         message.angular.z = command.angular_rad_s
         self.publisher.publish(message)
 
