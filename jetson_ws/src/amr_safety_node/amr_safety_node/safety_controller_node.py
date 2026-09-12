@@ -33,6 +33,7 @@ class SafetyControllerNode(Node):
         self.mcu = None
         self.dummy_active = False
         self.reset_requested = False
+        self.drive_requested = False
 
         self.create_subscription(Twist, "/cmd_vel_raw", self._on_command, 10)
         self.create_subscription(ObstacleInfo, "/obstacle/info", self._on_obstacle, 10)
@@ -40,6 +41,7 @@ class SafetyControllerNode(Node):
         self.create_subscription(McuStatus, "/mcu/status", self._on_mcu, 10)
         self.create_subscription(Bool, "/dummy/active", self._on_dummy, 10)
         self.create_subscription(Bool, "/safety/reset_request", self._on_reset, 10)
+        self.create_subscription(Bool, "/drive/request", self._on_drive_request, 10)
         self.velocity_pub = self.create_publisher(Twist, "/cmd_vel_safe", 10)
         self.state_pub = self.create_publisher(SafetyState, "/safety/state", 10)
         self.timer = self.create_timer(1.0 / rate, self._tick)
@@ -68,6 +70,9 @@ class SafetyControllerNode(Node):
     def _on_reset(self, message: Bool) -> None:
         self.reset_requested = bool(message.data)
 
+    def _on_drive_request(self, message: Bool) -> None:
+        self.drive_requested = bool(message.data)
+
     def _tick(self) -> None:
         now = self.now_s()
         initialized = self.timeout.all_seen("obstacle", "cliff", "mcu")
@@ -88,6 +93,7 @@ class SafetyControllerNode(Node):
             reset_requested=self.reset_requested,
             drive_enable=(
                 bool(self.get_parameter("drive_enable").value)
+                and self.drive_requested
                 and not self.reset_requested
             ),
             obstacle_timed_out=self.timeout.is_timed_out("obstacle", now),
