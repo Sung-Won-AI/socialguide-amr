@@ -1,14 +1,14 @@
-# Jetson–STM32 통신 규격 초안
+Jetson–STM32 통신 규격 초안
 
 상태: Draft  
-프로토콜 버전: 1
+프로토콜 버전: 2
 
 ## 프레임
 
 | 필드 | 크기 | 설명 |
 |---|---:|---|
 | SOF | 2 bytes | `AA 55` |
-| Version | 1 byte | 현재 `1` |
+| Version | 1 byte | 현재 `2` |
 | Message ID | 1 byte | 메시지 종류 |
 | Sequence | 1 byte | 0~255 순환 |
 | Payload Length | 1 byte | 최대 32 |
@@ -47,7 +47,7 @@ Payload 형식: `<HhhHBB`
 
 ## ROBOT_STATUS
 
-Payload 형식: `<BHhhHHHHI`
+Payload 형식: `<BHhhHHHHIHHH`
 
 | 필드 | 형식 | 단위 |
 |---|---|---|
@@ -60,6 +60,9 @@ Payload 형식: `<BHhhHHHHI`
 | last_command_id | uint16 | - |
 | rx_error_count | uint16 | count |
 | uptime | uint32 | ms |
+| ultrasonic_front | uint16 | mm, `65535`는 invalid |
+| sharp_left | uint16 | mm, `65535`는 invalid |
+| sharp_right | uint16 | mm, `65535`는 invalid |
 
 ## 안전 규칙
 
