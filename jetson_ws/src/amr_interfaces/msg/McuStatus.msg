@@ -13,3 +13,7 @@ bool dummy
 float32 ultrasonic_front_m
 float32 sharp_left_m
 float32 sharp_right_m
+bool push_switch_pressed
+int16 requested_base_rpm
+int16 left_velocity_rpm
+int16 right_velocity_rpm
