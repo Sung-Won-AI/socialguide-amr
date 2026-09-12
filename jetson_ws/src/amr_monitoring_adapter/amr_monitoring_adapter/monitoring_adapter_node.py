@@ -5,7 +5,7 @@ from urllib.request import Request, urlopen
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import BatteryState
+from sensor_msgs.msg import BatteryState, Image, LaserScan
 from std_msgs.msg import Bool, String
 from amr_interfaces.msg import CliffState, McuStatus, ObstacleInfo, SafetyState
 
@@ -28,6 +28,8 @@ class MonitoringAdapterNode(Node):
         self.dummy_active = False
         self.scenario_name = ""
         self.failure_reported = False
+        self.camera_seen_ns = 0
+        self.lidar_seen_ns = 0
 
         self.create_subscription(SafetyState, "/safety/state", lambda m: setattr(self, "safety", m), 10)
         self.create_subscription(McuStatus, "/mcu/status", lambda m: setattr(self, "mcu", m), 10)
@@ -37,6 +39,8 @@ class MonitoringAdapterNode(Node):
         self.create_subscription(BatteryState, "/battery/state", lambda m: setattr(self, "battery", m), 10)
         self.create_subscription(Bool, "/dummy/active", self._on_dummy, 10)
         self.create_subscription(String, "/dummy/scenario_name", self._on_scenario, 10)
+        self.create_subscription(Image, "/yolo/annotated_image", self._on_camera, 2)
+        self.create_subscription(LaserScan, "/scan", self._on_lidar, 2)
         self.timer = self.create_timer(1.0 / rate, self._publish)
 
     def _on_dummy(self, message: Bool) -> None:
@@ -45,7 +49,14 @@ class MonitoringAdapterNode(Node):
     def _on_scenario(self, message: String) -> None:
         self.scenario_name = message.data
 
+    def _on_camera(self, _message: Image) -> None:
+        self.camera_seen_ns = self.get_clock().now().nanoseconds
+
+    def _on_lidar(self, _message: LaserScan) -> None:
+        self.lidar_seen_ns = self.get_clock().now().nanoseconds
+
     def _publish(self) -> None:
+        now_ns = self.get_clock().now().nanoseconds
         payload = make_monitoring_payload(
             safety=self.safety,
             mcu=self.mcu,
@@ -55,6 +66,8 @@ class MonitoringAdapterNode(Node):
             battery=self.battery,
             dummy_active=self.dummy_active,
             scenario_name=self.scenario_name,
+            camera_connected=(now_ns - self.camera_seen_ns < 1_000_000_000),
+            lidar_connected=(now_ns - self.lidar_seen_ns < 1_000_000_000),
         )
         request = Request(
             self.url,
@@ -83,4 +96,3 @@ def main(args=None) -> None:
     finally:
         node.destroy_node()
         rclpy.shutdown()
-
