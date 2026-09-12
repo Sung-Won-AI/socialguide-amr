@@ -18,6 +18,8 @@ void MotorDriver_BrakeOff(void);
 
 int16_t MotorDriver_GetLeftVelocityMmS(void);
 int16_t MotorDriver_GetRightVelocityMmS(void);
+int16_t MotorDriver_GetLeftVelocityRpm(void);
+int16_t MotorDriver_GetRightVelocityRpm(void);
 bool MotorDriver_HasFault(void);
 uint16_t MotorDriver_GetErrorCode(void);
 void MotorDriver_ReportFault(uint16_t error_code);
