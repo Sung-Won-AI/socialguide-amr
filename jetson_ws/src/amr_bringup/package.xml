@@ -14,5 +14,7 @@
   <exec_depend>amr_perception</exec_depend>
   <exec_depend>amr_mcu_bridge</exec_depend>
   <exec_depend>amr_audio</exec_depend>
+  <exec_depend>amr_navigation</exec_depend>
+  <exec_depend>amr_vision</exec_depend>
   <export><build_type>ament_python</build_type></export>
 </package>
