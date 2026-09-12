@@ -1,7 +1,7 @@
 import unittest
 
 from protocol.protocol_constants import DriveControlFlag, SafetyFlag, SystemState
-from jetson.amr_core.packet import DriveCommand
+from jetson.amr_core.packet import DriveCommand, WheelCommand
 from jetson.amr_core.serial_bridge import SerialBridge
 from jetson.amr_core.transport import memory_transport_pair
 from simulation.fake_stm32 import FakeSTM32
@@ -41,25 +41,33 @@ class FakeSTM32Tests(unittest.TestCase):
 
     def test_command_timeout_stops_and_latches(self) -> None:
         self.send_drive(0.0)
-        status = self.stm32.step(0.31, 0.1)
+        status = self.stm32.step(0.51, 0.1)
         self.assertEqual(status.system_state, SystemState.EMERGENCY_STOP)
         self.assertTrue(status.safety_flags & SafetyFlag.COMM_TIMEOUT)
         self.assertEqual(status.left_velocity_mm_s, 0)
 
-        status = self.send_drive(0.32)
+        status = self.send_drive(0.52)
         self.assertEqual(status.system_state, SystemState.EMERGENCY_STOP)
 
     def test_reset_required_after_timeout(self) -> None:
         self.send_drive(0.0)
-        self.stm32.step(0.31, 0.1)
+        self.stm32.step(0.51, 0.1)
         reset = self.send_drive(
-            0.32,
+            0.52,
             speed_mm_s=0,
             flags=DriveControlFlag.RESET_REQUEST,
         )
         self.assertEqual(reset.system_state, SystemState.READY)
-        running = self.send_drive(0.42)
+        running = self.send_drive(0.62)
         self.assertEqual(running.system_state, SystemState.RUN)
+
+    def test_wheel_command_accepts_independent_rpm(self) -> None:
+        self.bridge.send_wheel_command(
+            WheelCommand(7, 40, 20, int(DriveControlFlag.DRIVE_ENABLE), 0)
+        )
+        status = self.stm32.step(0.0, 0.1)
+        self.assertEqual(status.system_state, SystemState.RUN)
+        self.assertGreater(status.left_velocity_rpm, status.right_velocity_rpm)
 
     def test_cliff_overrides_drive_command(self) -> None:
         self.stm32.hazards.cliff_left = True
@@ -77,4 +85,3 @@ class FakeSTM32Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
