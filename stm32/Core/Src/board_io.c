@@ -6,12 +6,28 @@
 #include "board_config.h"
 #include "main.h"
 #include "motor_driver.h"
+#include "range_sensors.h"
 
 static bool board_ready;
 
 __weak uint16_t BoardIO_ReadBatteryVoltageMv(void)
 {
     return 0U;
+}
+
+__weak uint16_t BoardIO_ReadUltrasonicFrontMm(void)
+{
+    return AMR_RANGE_INVALID_MM;
+}
+
+__weak uint16_t BoardIO_ReadSharpLeftMm(void)
+{
+    return AMR_RANGE_INVALID_MM;
+}
+
+__weak uint16_t BoardIO_ReadSharpRightMm(void)
+{
+    return AMR_RANGE_INVALID_MM;
 }
 
 void BoardIO_Init(void)
@@ -112,4 +128,7 @@ void BoardIO_ReadHardwareInputs(AmrHardwareInputs *inputs_out)
         MotorDriver_GetRightVelocityMmS();
     inputs_out->battery_voltage_mv = battery_mv;
     inputs_out->motor_error_code = MotorDriver_GetErrorCode();
+    inputs_out->ultrasonic_front_mm = BoardIO_ReadUltrasonicFrontMm();
+    inputs_out->sharp_left_mm = BoardIO_ReadSharpLeftMm();
+    inputs_out->sharp_right_mm = BoardIO_ReadSharpRightMm();
 }
