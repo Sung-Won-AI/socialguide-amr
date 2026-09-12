@@ -1,4 +1,4 @@
-하드웨어 독립 통합 시뮬레이션
+# 하드웨어 독립 통합 시뮬레이션
 
 Jetson 통합 컨트롤러, 통신 브리지, 가상 STM32를 메모리 통신으로 연결한다.
 
@@ -19,10 +19,10 @@ python3 -m simulation.scenario_runner
 
 `FakeSTM32`는 다음 기능을 모의한다.
 
-- DRIVE_COMMAND 수신
+- WHEEL_COMMAND 좌·우 목표 RPM 수신 (기존 DRIVE_COMMAND도 호환)
 - 차동 구동 목표속도 변환
 - 모터 가감속
-- 300ms 명령 타임아웃
+- 500ms 명령 타임아웃
 - Cliff·E-Stop·모터 고장
 - 정지 후 수동 리셋
 - ROBOT_STATUS 반환
