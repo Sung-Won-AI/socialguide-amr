@@ -9,6 +9,9 @@
 #include "range_sensors.h"
 
 static bool board_ready;
+static bool drive_switch_stable;
+static bool drive_switch_raw_previous;
+static uint32_t drive_switch_changed_ms;
 
 __weak uint16_t BoardIO_ReadBatteryVoltageMv(void)
 {
@@ -33,6 +36,9 @@ __weak uint16_t BoardIO_ReadSharpRightMm(void)
 void BoardIO_Init(void)
 {
     board_ready = false;
+    drive_switch_stable = false;
+    drive_switch_raw_previous = false;
+    drive_switch_changed_ms = HAL_GetTick();
 
     /* Preserve the electronic team's precharge sequence. */
     HAL_GPIO_WritePin(
@@ -97,6 +103,25 @@ static bool handle_released(void)
 #endif
 }
 
+static bool drive_switch_pressed(void)
+{
+#if AMR_HAS_DRIVE_SWITCH_INPUT
+    bool raw = HAL_GPIO_ReadPin(DRIVE_SWITCH_GPIO_Port, DRIVE_SWITCH_Pin)
+        == AMR_DRIVE_SWITCH_ACTIVE_LEVEL;
+    uint32_t now_ms = HAL_GetTick();
+    if (raw != drive_switch_raw_previous) {
+        drive_switch_raw_previous = raw;
+        drive_switch_changed_ms = now_ms;
+    }
+    if ((uint32_t)(now_ms - drive_switch_changed_ms) >= 40U) {
+        drive_switch_stable = raw;
+    }
+    return drive_switch_stable;
+#else
+    return false;
+#endif
+}
+
 void BoardIO_ReadHardwareInputs(AmrHardwareInputs *inputs_out)
 {
     uint16_t battery_mv;
@@ -131,4 +156,10 @@ void BoardIO_ReadHardwareInputs(AmrHardwareInputs *inputs_out)
     inputs_out->ultrasonic_front_mm = BoardIO_ReadUltrasonicFrontMm();
     inputs_out->sharp_left_mm = BoardIO_ReadSharpLeftMm();
     inputs_out->sharp_right_mm = BoardIO_ReadSharpRightMm();
+    inputs_out->push_switch_pressed = drive_switch_pressed();
+    inputs_out->requested_base_rpm = AMR_REQUESTED_BASE_RPM;
+    inputs_out->measured_left_velocity_rpm =
+        MotorDriver_GetLeftVelocityRpm();
+    inputs_out->measured_right_velocity_rpm =
+        MotorDriver_GetRightVelocityRpm();
 }
