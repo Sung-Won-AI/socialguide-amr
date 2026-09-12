@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define AMR_PROTOCOL_VERSION 1U
+#define AMR_PROTOCOL_VERSION 2U
 #define AMR_SOF_BYTE_0 0xAAU
 #define AMR_SOF_BYTE_1 0x55U
 #define AMR_MAX_PAYLOAD_SIZE 32U
@@ -55,4 +55,3 @@ typedef enum {
 } AmrDriveControlFlag;
 
 #endif
-
