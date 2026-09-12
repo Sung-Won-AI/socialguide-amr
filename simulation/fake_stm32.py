@@ -13,7 +13,9 @@ from protocol.protocol_constants import (
 from jetson.amr_core.packet import (
     DriveCommand,
     RobotStatus,
+    WheelCommand,
     decode_drive_command,
+    decode_wheel_command,
     encode_robot_status,
     extract_packets,
 )
@@ -35,8 +37,9 @@ class FakeSTM32:
         self,
         transport: ByteTransport,
         *,
-        command_timeout_s: float = 0.3,
+        command_timeout_s: float = 0.5,
         wheel_base_m: float = 0.5,
+        wheel_diameter_m: float = 0.2,
         acceleration_mps2: float = 1.0,
         battery_voltage_mv: int = 24_000,
     ) -> None:
@@ -49,6 +52,7 @@ class FakeSTM32:
         self.transport = transport
         self.command_timeout_s = command_timeout_s
         self.wheel_base_m = wheel_base_m
+        self.wheel_diameter_m = wheel_diameter_m
         self.acceleration_mps2 = acceleration_mps2
         self.battery_voltage_mv = battery_voltage_mv
         self.hazards = SimulatedHazards()
@@ -65,6 +69,8 @@ class FakeSTM32:
         self._restart_latched = False
         self._rx_buffer = bytearray()
         self._tx_sequence = 0
+        self.push_switch_pressed = True
+        self.requested_base_rpm = 30
 
     def step(self, now_s: float, dt_s: float, *, publish_status: bool = True) -> RobotStatus:
         if dt_s < 0:
@@ -99,6 +105,14 @@ class FakeSTM32:
             last_command_id=self.last_command_id,
             rx_error_count=self.rx_error_count,
             uptime_ms=max(0, round((now_s - start) * 1000)),
+            push_switch_pressed=self.push_switch_pressed,
+            requested_base_rpm=self.requested_base_rpm,
+            left_velocity_rpm=round(
+                self.left_velocity_mps * 60.0 / (3.141592653589793 * self.wheel_diameter_m)
+            ),
+            right_velocity_rpm=round(
+                self.right_velocity_mps * 60.0 / (3.141592653589793 * self.wheel_diameter_m)
+            ),
         )
 
     def _receive_commands(self, now_s: float) -> None:
@@ -107,16 +121,53 @@ class FakeSTM32:
             self._rx_buffer.extend(incoming)
         packets, self._rx_buffer = extract_packets(self._rx_buffer)
         for packet in packets:
-            if packet.message_id != MessageId.DRIVE_COMMAND:
-                continue
             try:
-                command = decode_drive_command(packet)
+                if packet.message_id == MessageId.WHEEL_COMMAND:
+                    command = decode_wheel_command(packet)
+                elif packet.message_id == MessageId.DRIVE_COMMAND:
+                    command = decode_drive_command(packet)
+                else:
+                    continue
             except ValueError:
                 self.rx_error_count += 1
                 continue
             self._last_drive_time = now_s
             self.last_command_id = command.command_id
-            self._apply_drive_command(command)
+            if isinstance(command, WheelCommand):
+                self._apply_wheel_command(command)
+            else:
+                self._apply_drive_command(command)
+
+    def _apply_wheel_command(self, command: WheelCommand) -> None:
+        flags = DriveControlFlag(command.control_flags)
+        if command.emergency:
+            self.state = SystemState.EMERGENCY_STOP
+            self._restart_latched = True
+            self._stop_targets()
+            return
+        if flags & DriveControlFlag.RESET_REQUEST:
+            if not self._physical_hazard_active():
+                self._restart_latched = False
+                self.state = SystemState.READY
+                self.flags &= ~SafetyFlag.COMM_TIMEOUT
+            self._stop_targets()
+            return
+        if self._restart_latched:
+            self._stop_targets()
+            return
+        if flags & DriveControlFlag.CONTROLLED_STOP:
+            self.state = SystemState.CONTROLLED_STOP
+            self._restart_latched = True
+            self._stop_targets()
+            return
+        if not flags & DriveControlFlag.DRIVE_ENABLE:
+            self.state = SystemState.READY
+            self._stop_targets()
+            return
+        metres_per_rev = 3.141592653589793 * self.wheel_diameter_m
+        self._target_left_mps = command.left_target_rpm * metres_per_rev / 60.0
+        self._target_right_mps = command.right_target_rpm * metres_per_rev / 60.0
+        self.state = SystemState.SLOW if flags & DriveControlFlag.SLOW_MODE else SystemState.RUN
 
     def _apply_drive_command(self, command: DriveCommand) -> None:
         flags = DriveControlFlag(command.control_flags)
@@ -202,4 +253,3 @@ class FakeSTM32:
         if abs(difference) <= maximum_change:
             return target
         return current + maximum_change * (1 if difference > 0 else -1)
-
