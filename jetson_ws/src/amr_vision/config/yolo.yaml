@@ -1,0 +1,7 @@
+yolo_node:
+  ros__parameters:
+    image_topic: /oak/rgb/image_raw
+    model: yolo11n.pt
+    confidence: 0.35
+    device: "0"
+    maximum_rate_hz: 15.0
