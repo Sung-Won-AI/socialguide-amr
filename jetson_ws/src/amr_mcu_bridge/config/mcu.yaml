@@ -5,3 +5,9 @@ mcu_bridge_node:
     command_rate_hz: 20.0
     status_timeout_s: 0.35
     maximum_speed_mps: 0.5
+    wheel_diameter_m: 0.20
+    wheel_base_m: 0.50
+    maximum_wheel_rpm: 300
+    left_trim_rpm: 0
+    right_trim_rpm: 0
+    switch_mode: hold
