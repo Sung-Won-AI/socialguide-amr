@@ -1,4 +1,4 @@
-Jetson–STM32 통신 규격 초안
+# Jetson–STM32 통신 규격 초안
 
 상태: Draft  
 프로토콜 버전: 2
@@ -45,6 +45,23 @@ Payload 형식: `<HhhHBB`
 위험 조건이 모두 해제된 경우에만 READY로 전환하고, 이후 별도의
 `DRIVE_ENABLE` 패킷을 받아야 주행한다.
 
+## WHEEL_COMMAND
+
+CPU가 최종 결정한 좌우 목표 RPM을 STM32에 직접 전달하는 운영 명령이다.
+Payload 형식은 `<HhhBB`이며 메시지 ID는 `0x13`이다.
+
+| 필드 | 형식 | 단위 |
+|---|---|---|
+| command_id | uint16 | - |
+| left_target_rpm | int16 | RPM |
+| right_target_rpm | int16 | RPM |
+| control_flags | uint8 | bit field |
+| emergency | uint8 | `0` 정상, `1` 즉시 정지 및 래치 |
+
+Jetson은 50ms 주기로 이 명령을 반복 전송한다. STM32는 좌우 목표 RPM을
+바퀴 선속도로 변환한 뒤 엔코더 PID로 추종하며, 마지막 정상 명령 이후
+500ms가 지나면 명령값과 무관하게 정지한다.
+
 ## ROBOT_STATUS
 
 Payload 형식: `<BHhhHHHHIHHH`
@@ -63,10 +80,14 @@ Payload 형식: `<BHhhHHHHIHHH`
 | ultrasonic_front | uint16 | mm, `65535`는 invalid |
 | sharp_left | uint16 | mm, `65535`는 invalid |
 | sharp_right | uint16 | mm, `65535`는 invalid |
+| push_switch_pressed | uint8 | `0` 해제, `1` 눌림 |
+| requested_base_rpm | int16 | RPM |
+| left_velocity_rpm | int16 | RPM |
+| right_velocity_rpm | int16 | RPM |
 
 ## 안전 규칙
 
 - CRC 또는 길이가 잘못된 명령은 실행하지 않는다.
-- 마지막 유효 주행 명령 이후 300ms가 지나면 STM32가 정지한다.
+- 마지막 유효 주행 명령 이후 500ms가 지나면 STM32가 정지한다.
 - 통신이 복구돼도 자동으로 재출발하지 않는다.
 - Cliff, E-Stop 및 STM32 고장은 Jetson 명령보다 우선한다.
