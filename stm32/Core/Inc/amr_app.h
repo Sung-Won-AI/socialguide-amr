@@ -23,6 +23,9 @@ typedef struct {
     int16_t measured_right_velocity_mm_s;
     uint16_t battery_voltage_mv;
     uint16_t motor_error_code;
+    uint16_t ultrasonic_front_mm;
+    uint16_t sharp_left_mm;
+    uint16_t sharp_right_mm;
 } AmrHardwareInputs;
 
 typedef struct {
