@@ -10,7 +10,8 @@
 #define AMR_FRAME_OVERHEAD_SIZE 8U
 #define AMR_MAX_FRAME_SIZE (AMR_MAX_PAYLOAD_SIZE + AMR_FRAME_OVERHEAD_SIZE)
 #define AMR_DRIVE_COMMAND_PAYLOAD_SIZE 10U
-#define AMR_ROBOT_STATUS_PAYLOAD_SIZE 25U
+#define AMR_WHEEL_COMMAND_PAYLOAD_SIZE 8U
+#define AMR_ROBOT_STATUS_PAYLOAD_SIZE 32U
 
 typedef struct {
     uint8_t version;
@@ -29,6 +30,14 @@ typedef struct {
 } AmrDriveCommand;
 
 typedef struct {
+    uint16_t command_id;
+    int16_t left_target_rpm;
+    int16_t right_target_rpm;
+    uint8_t control_flags;
+    uint8_t emergency;
+} AmrWheelCommand;
+
+typedef struct {
     AmrSystemState system_state;
     uint16_t safety_flags;
     int16_t left_velocity_mm_s;
@@ -41,6 +50,10 @@ typedef struct {
     uint16_t ultrasonic_front_mm;
     uint16_t sharp_left_mm;
     uint16_t sharp_right_mm;
+    uint8_t push_switch_pressed;
+    int16_t requested_base_rpm;
+    int16_t left_velocity_rpm;
+    int16_t right_velocity_rpm;
 } AmrRobotStatus;
 
 typedef enum {
@@ -78,6 +91,11 @@ size_t AmrProtocol_EncodeFrame(
 bool AmrProtocol_DecodeDriveCommand(
     const AmrPacket *packet,
     AmrDriveCommand *command_out
+);
+
+bool AmrProtocol_DecodeWheelCommand(
+    const AmrPacket *packet,
+    AmrWheelCommand *command_out
 );
 
 size_t AmrProtocol_EncodeRobotStatus(
