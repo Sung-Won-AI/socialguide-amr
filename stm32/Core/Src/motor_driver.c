@@ -18,6 +18,8 @@ static int16_t left_target_mm_s;
 static int16_t right_target_mm_s;
 static int16_t left_velocity_mm_s;
 static int16_t right_velocity_mm_s;
+static int16_t left_velocity_rpm;
+static int16_t right_velocity_rpm;
 static uint32_t left_encoder_previous;
 static uint16_t right_encoder_previous;
 static PidState left_pid;
@@ -146,6 +148,8 @@ void MotorDriver_UpdateFeedback(void)
         / (AMR_ENCODER_COUNTS_PER_OUTPUT_REV * period_sec);
     left_velocity_mm_s = rpm_to_mm_s(left_rpm);
     right_velocity_mm_s = rpm_to_mm_s(right_rpm);
+    left_velocity_rpm = (int16_t)(left_rpm + ((left_rpm >= 0.0f) ? 0.5f : -0.5f));
+    right_velocity_rpm = (int16_t)(right_rpm + ((right_rpm >= 0.0f) ? 0.5f : -0.5f));
 }
 
 void MotorDriver_SetTargetMmS(
@@ -234,6 +238,16 @@ int16_t MotorDriver_GetLeftVelocityMmS(void)
 int16_t MotorDriver_GetRightVelocityMmS(void)
 {
     return right_velocity_mm_s;
+}
+
+int16_t MotorDriver_GetLeftVelocityRpm(void)
+{
+    return left_velocity_rpm;
+}
+
+int16_t MotorDriver_GetRightVelocityRpm(void)
+{
+    return right_velocity_rpm;
 }
 
 bool MotorDriver_HasFault(void)
