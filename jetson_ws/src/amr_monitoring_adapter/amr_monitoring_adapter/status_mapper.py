@@ -23,6 +23,8 @@ def make_monitoring_payload(
     battery=None,
     dummy_active: bool = False,
     scenario_name: str = "",
+    camera_connected: bool = False,
+    lidar_connected: bool = False,
 ) -> dict:
     state_value = int(safety.state) if safety is not None else int(SystemState.INIT)
     try:
@@ -50,8 +52,8 @@ def make_monitoring_payload(
         "connection": {
             "jetson": safety is not None,
             "stm32": bool(mcu and mcu.connected),
-            "lidar": obstacle is not None,
-            "camera": False,
+            "lidar": lidar_connected,
+            "camera": camera_connected,
         },
         "velocity": {
             "target_linear_mps": float(velocity.linear.x) if velocity else 0.0,
@@ -78,6 +80,11 @@ def make_monitoring_payload(
                 _optional_finite(cliff.right_distance_m) if cliff else None
             ),
         },
+        "range_sensors": {
+            "ultrasonic_front_m": _optional_finite(getattr(mcu, "ultrasonic_front_m", math.nan)) if mcu else None,
+            "sharp_left_m": _optional_finite(getattr(mcu, "sharp_left_m", math.nan)) if mcu else None,
+            "sharp_right_m": _optional_finite(getattr(mcu, "sharp_right_m", math.nan)) if mcu else None,
+        },
         "battery": {
             "voltage_v": _optional_finite(battery.voltage) if battery else None,
             "percent": (
@@ -88,7 +95,7 @@ def make_monitoring_payload(
             "warning": bool(battery and battery.percentage < 0.2),
         },
         "diagnostics": {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "motor_error": int(mcu.motor_error) if mcu else 0,
             "rx_error_count": int(mcu.rx_error_count) if mcu else 0,
             "last_command_id": int(mcu.last_command_id) if mcu else 0,
@@ -98,4 +105,3 @@ def make_monitoring_payload(
             reason if state_name in {"CONTROLLED_STOP", "EMERGENCY_STOP", "FAULT"} else "없음"
         ),
     }
-
