@@ -153,6 +153,13 @@ function updateDiagnostics(status) {
   }
 }
 
+function updateRangeSensors(sensors) {
+  const distance = (value) => Number.isFinite(value) ? `${numeric(value)} m` : "—";
+  setText("ultrasonic-front", distance(sensors.ultrasonic_front_m));
+  setText("sharp-left", distance(sensors.sharp_left_m));
+  setText("sharp-right", distance(sensors.sharp_right_m));
+}
+
 function updateEvents(events) {
   const list = $("event-list");
   list.replaceChildren();
@@ -196,6 +203,7 @@ function render(payload) {
   updateVelocity(status.velocity);
   updateObstacle(status.obstacle);
   updateCliff(status.cliff);
+  updateRangeSensors(status.range_sensors);
   updateBattery(status.battery);
   updateDiagnostics(status);
   updateEvents(payload.events);
