@@ -16,6 +16,13 @@ STL-27L /scan + 근거리 Range
   -> amr_mcu_bridge
   -> STM32 좌우 휠 PID
 
+STM32 Push Switch + requested base RPM
+  -> Protocol v2 ROBOT_STATUS (100ms)
+  -> /drive/request + /drive/base_speed_mps
+  -> Jetson 경로/안전 계산
+  -> WHEEL_COMMAND 좌우 목표 RPM (50ms)
+  -> STM32 독립 좌/우 PID (10ms)
+
 OAK-D /oak/rgb/image_raw + STL-27L /scan + /mcu/status
   -> camera_path_node + path_guidance_node
   -> /cmd_vel_raw
