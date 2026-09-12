@@ -165,7 +165,7 @@ static void test_watchdog_wraparound(void)
 
 static void test_motor_targets(void)
 {
-    AmrMotorConfig config = {500U, 500U, 250U, false};
+    AmrMotorConfig config = {500U, 200.0f, 500U, 250U, false};
     AmrSafetyManager safety;
     AmrDriveCommand command = {1U, 500, 400, 500U, AMR_DRIVE_ENABLE};
     AmrMotorTargets targets;
@@ -189,7 +189,7 @@ static void test_motor_targets(void)
 
 static void test_app_end_to_end(void)
 {
-    AmrMotorConfig config = {500U, 500U, 250U, false};
+    AmrMotorConfig config = {500U, 200.0f, 500U, 250U, false};
     AmrHardwareInputs hardware;
     AmrApp app;
     uint8_t frame[AMR_MAX_FRAME_SIZE];
