@@ -12,5 +12,9 @@ bool BoardIO_IsReady(void);
 
 /* Override this weak function when an ADC or BMS driver is available. */
 uint16_t BoardIO_ReadBatteryVoltageMv(void);
+/* Override these hooks in the CubeMX project after timer/ADC wiring is known. */
+uint16_t BoardIO_ReadUltrasonicFrontMm(void);
+uint16_t BoardIO_ReadSharpLeftMm(void);
+uint16_t BoardIO_ReadSharpRightMm(void);
 
 #endif
