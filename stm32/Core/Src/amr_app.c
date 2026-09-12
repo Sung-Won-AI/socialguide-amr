@@ -28,6 +28,7 @@ AmrParseResult AmrApp_ProcessRxByte(
 {
     AmrPacket packet;
     AmrDriveCommand command;
+    AmrWheelCommand wheel_command;
     AmrParseResult result;
 
     if (app == NULL) {
@@ -39,6 +40,17 @@ AmrParseResult AmrApp_ProcessRxByte(
         return result;
     }
 
+    if (packet.message_id == AMR_MSG_WHEEL_COMMAND) {
+        if (!AmrProtocol_DecodeWheelCommand(&packet, &wheel_command)) {
+            app->parser.format_error_count++;
+            return AMR_PARSE_FORMAT_ERROR;
+        }
+        app->last_wheel_command = wheel_command;
+        app->has_valid_wheel_command = true;
+        app->has_valid_command = false;
+        AmrWatchdog_Kick(&app->watchdog, now_ms);
+        return AMR_PARSE_PACKET;
+    }
     if (packet.message_id != AMR_MSG_DRIVE_COMMAND) {
         return result;
     }
@@ -49,6 +61,7 @@ AmrParseResult AmrApp_ProcessRxByte(
 
     app->last_command = command;
     app->has_valid_command = true;
+    app->has_valid_wheel_command = false;
     AmrWatchdog_Kick(&app->watchdog, now_ms);
     return AMR_PARSE_PACKET;
 }
@@ -67,7 +80,9 @@ void AmrApp_Tick(
     }
 
     memset(&safety_inputs, 0, sizeof(safety_inputs));
-    flags = app->has_valid_command ? app->last_command.control_flags : 0U;
+    flags = app->has_valid_wheel_command
+        ? app->last_wheel_command.control_flags
+        : (app->has_valid_command ? app->last_command.control_flags : 0U);
     safety_inputs.initialization_complete = hardware->initialization_complete;
     safety_inputs.drive_enable =
         (flags & AMR_DRIVE_ENABLE) != 0U;
@@ -77,7 +92,9 @@ void AmrApp_Tick(
         (flags & AMR_DRIVE_CONTROLLED_STOP) != 0U;
     safety_inputs.reset_request =
         (flags & AMR_DRIVE_RESET_REQUEST) != 0U;
-    safety_inputs.estop_active = hardware->estop_active;
+    safety_inputs.estop_active = hardware->estop_active
+        || (app->has_valid_wheel_command
+            && (app->last_wheel_command.emergency != 0U));
     safety_inputs.cliff_left = hardware->cliff_left;
     safety_inputs.cliff_right = hardware->cliff_right;
     safety_inputs.communication_timeout =
@@ -88,12 +105,21 @@ void AmrApp_Tick(
     safety_inputs.low_battery_warning = hardware->low_battery_warning;
 
     AmrSafety_Update(&app->safety, &safety_inputs);
-    AmrMotor_ComputeTargets(
-        &app->motor_config,
-        &app->safety,
-        app->has_valid_command ? &app->last_command : NULL,
-        &app->motor_targets
-    );
+    if (app->has_valid_wheel_command) {
+        AmrMotor_ComputeWheelRpmTargets(
+            &app->motor_config,
+            &app->safety,
+            &app->last_wheel_command,
+            &app->motor_targets
+        );
+    } else {
+        AmrMotor_ComputeTargets(
+            &app->motor_config,
+            &app->safety,
+            app->has_valid_command ? &app->last_command : NULL,
+            &app->motor_targets
+        );
+    }
 
     app->status.system_state = app->safety.state;
     app->status.safety_flags = app->safety.flags;
@@ -107,7 +133,9 @@ void AmrApp_Tick(
     app->status.battery_voltage_mv = hardware->battery_voltage_mv;
     app->status.motor_error = hardware->motor_error_code;
     app->status.last_command_id =
-        app->has_valid_command ? app->last_command.command_id : 0U;
+        app->has_valid_wheel_command
+            ? app->last_wheel_command.command_id
+            : (app->has_valid_command ? app->last_command.command_id : 0U);
     app->status.rx_error_count = (uint16_t)(
         app->parser.crc_error_count
         + app->parser.format_error_count
@@ -117,6 +145,10 @@ void AmrApp_Tick(
     app->status.ultrasonic_front_mm = hardware->ultrasonic_front_mm;
     app->status.sharp_left_mm = hardware->sharp_left_mm;
     app->status.sharp_right_mm = hardware->sharp_right_mm;
+    app->status.push_switch_pressed = hardware->push_switch_pressed ? 1U : 0U;
+    app->status.requested_base_rpm = hardware->requested_base_rpm;
+    app->status.left_velocity_rpm = hardware->measured_left_velocity_rpm;
+    app->status.right_velocity_rpm = hardware->measured_right_velocity_rpm;
 }
 
 size_t AmrApp_EncodeStatus(
