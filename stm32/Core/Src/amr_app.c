@@ -114,6 +114,9 @@ void AmrApp_Tick(
         + app->parser.version_error_count
     );
     app->status.uptime_ms = now_ms;
+    app->status.ultrasonic_front_mm = hardware->ultrasonic_front_mm;
+    app->status.sharp_left_mm = hardware->sharp_left_mm;
+    app->status.sharp_right_mm = hardware->sharp_right_mm;
 }
 
 size_t AmrApp_EncodeStatus(
