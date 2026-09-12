@@ -4,9 +4,10 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool, String
 from amr_interfaces.msg import CliffState, McuStatus, SafetyState
 
-from jetson.amr_core.packet import DriveCommand
+from jetson.amr_core.packet import WheelCommand
 from jetson.amr_core.serial_bridge import SerialBridge
 from jetson.amr_core.transport import memory_transport_pair
+from jetson.amr_core.wheel_kinematics import twist_to_wheel_rpm
 from protocol.protocol_constants import DriveControlFlag, SystemState
 from simulation.fake_stm32 import FakeSTM32
 
@@ -69,14 +70,18 @@ class DummyMcuNode(Node):
         elif self.safety_state == SystemState.CONTROLLED_STOP:
             flags |= DriveControlFlag.CONTROLLED_STOP
 
-        command = DriveCommand(
-            self.command_id,
-            round(self.safe_cmd.linear.x * 1000),
-            round(self.safe_cmd.angular.z * 1000),
-            500,
-            int(flags),
+        left_rpm, right_rpm = twist_to_wheel_rpm(
+            self.safe_cmd.linear.x,
+            self.safe_cmd.angular.z,
+            wheel_diameter_m=0.2,
+            wheel_base_m=0.5,
+            maximum_rpm=300,
         )
-        self.bridge.send_drive_command(command)
+        command = WheelCommand(
+            self.command_id, left_rpm, right_rpm, int(flags),
+            int(self.safety_state in (SystemState.EMERGENCY_STOP, SystemState.FAULT)),
+        )
+        self.bridge.send_wheel_command(command)
         status = self.mcu.step(now_s, dt_s)
         self.bridge.poll(now_s=now_s)
 
@@ -93,6 +98,10 @@ class DummyMcuNode(Node):
         message.uptime_ms = status.uptime_ms
         message.connected = True
         message.dummy = True
+        message.push_switch_pressed = status.push_switch_pressed
+        message.requested_base_rpm = status.requested_base_rpm
+        message.left_velocity_rpm = status.left_velocity_rpm
+        message.right_velocity_rpm = status.right_velocity_rpm
         if not self.suppress_status:
             self.status_pub.publish(message)
 
