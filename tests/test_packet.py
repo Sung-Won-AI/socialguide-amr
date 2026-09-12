@@ -50,6 +50,9 @@ class PacketTests(unittest.TestCase):
             last_command_id=91,
             rx_error_count=2,
             uptime_ms=120_000,
+            ultrasonic_front_mm=620,
+            sharp_left_mm=210,
+            sharp_right_mm=230,
         )
         packet = decode_packet(encode_robot_status(original, sequence=10))
         self.assertEqual(decode_robot_status(packet), original)
