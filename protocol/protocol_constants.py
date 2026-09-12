@@ -6,7 +6,7 @@ Keep numeric values synchronized with protocol_constants.h.
 from enum import IntEnum, IntFlag
 
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 SOF = b"\xAA\x55"
 MAX_PAYLOAD_SIZE = 32
 
