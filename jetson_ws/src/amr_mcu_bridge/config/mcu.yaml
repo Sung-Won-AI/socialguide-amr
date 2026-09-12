@@ -1,0 +1,7 @@
+mcu_bridge_node:
+  ros__parameters:
+    port: /dev/ttyUSB_mcu
+    baudrate: 115200
+    command_rate_hz: 20.0
+    status_timeout_s: 0.35
+    maximum_speed_mps: 0.5
