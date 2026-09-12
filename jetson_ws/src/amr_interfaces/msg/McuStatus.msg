@@ -10,3 +10,6 @@ uint16 rx_error_count
 uint32 uptime_ms
 bool connected
 bool dummy
+float32 ultrasonic_front_m
+float32 sharp_left_m
+float32 sharp_right_m
