@@ -188,6 +188,25 @@ bool AmrProtocol_DecodeDriveCommand(
     return true;
 }
 
+bool AmrProtocol_DecodeWheelCommand(
+    const AmrPacket *packet,
+    AmrWheelCommand *command_out
+)
+{
+    if ((packet == NULL)
+        || (command_out == NULL)
+        || (packet->message_id != AMR_MSG_WHEEL_COMMAND)
+        || (packet->payload_length != AMR_WHEEL_COMMAND_PAYLOAD_SIZE)) {
+        return false;
+    }
+    command_out->command_id = read_u16_le(&packet->payload[0]);
+    command_out->left_target_rpm = (int16_t)read_u16_le(&packet->payload[2]);
+    command_out->right_target_rpm = (int16_t)read_u16_le(&packet->payload[4]);
+    command_out->control_flags = packet->payload[6];
+    command_out->emergency = packet->payload[7];
+    return command_out->emergency <= 1U;
+}
+
 size_t AmrProtocol_EncodeRobotStatus(
     const AmrRobotStatus *status,
     uint8_t sequence,
@@ -213,6 +232,10 @@ size_t AmrProtocol_EncodeRobotStatus(
     write_u16_le(&payload[19], status->ultrasonic_front_mm);
     write_u16_le(&payload[21], status->sharp_left_mm);
     write_u16_le(&payload[23], status->sharp_right_mm);
+    payload[25] = status->push_switch_pressed;
+    write_u16_le(&payload[26], (uint16_t)status->requested_base_rpm);
+    write_u16_le(&payload[28], (uint16_t)status->left_velocity_rpm);
+    write_u16_le(&payload[30], (uint16_t)status->right_velocity_rpm);
 
     return AmrProtocol_EncodeFrame(
         AMR_MSG_ROBOT_STATUS,
