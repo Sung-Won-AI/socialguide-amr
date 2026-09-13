@@ -9,6 +9,8 @@ fi
 ROS_DISTRO="${ROS_DISTRO:-humble}"
 MCU_DEVICE="${MCU_DEVICE:-/dev/ttyTHS1}"
 LIDAR_DEVICE="${LIDAR_DEVICE:-/dev/ttyUSB_lidar}"
+VISION_MODE="${VISION_MODE:-docker}"
+YOLO_DOCKER_IMAGE="${YOLO_DOCKER_IMAGE:-socialguide-amr-oak-yolo:jp6}"
 errors=0
 
 check_file() {
@@ -22,11 +24,22 @@ check_file "$MCU_DEVICE"
 check_file "$LIDAR_DEVICE"
 if lsusb | grep -qiE 'Luxonis|03e7'; then echo "[ OK ] OAK-D USB 확인";
 else echo "[FAIL] OAK-D USB를 찾지 못함"; errors=$((errors + 1)); fi
-if ! python3 -c 'import torch, ultralytics, cv2; assert torch.cuda.is_available()' 2>/dev/null; then
-  echo "[FAIL] CUDA PyTorch/Ultralytics/OpenCV 환경 확인 실패"
+if [[ "$VISION_MODE" == "docker" ]]; then
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "[FAIL] Docker 없음"
+    errors=$((errors + 1))
+  elif ! docker image inspect "$YOLO_DOCKER_IMAGE" >/dev/null 2>&1; then
+    echo "[FAIL] YOLO Docker 이미지 없음: $YOLO_DOCKER_IMAGE"
+    echo "       먼저 ./scripts/build_yolo_docker.sh 를 실행하세요."
+    errors=$((errors + 1))
+  else
+    echo "[ OK ] YOLO Docker 이미지 확인"
+  fi
+elif ! python3 -c 'import torch, ultralytics, cv2; assert torch.cuda.is_available()' 2>/dev/null; then
+  echo "[FAIL] 호스트 CUDA PyTorch/Ultralytics/OpenCV 환경 확인 실패"
   errors=$((errors + 1))
 else
-  echo "[ OK ] YOLO CUDA 환경 확인"
+  echo "[ OK ] 호스트 YOLO CUDA 환경 확인"
 fi
 
 if (( errors > 0 )); then
