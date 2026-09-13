@@ -7,7 +7,7 @@ if [[ -f "$PROJECT_DIR/config/runtime.env" ]]; then
   source "$PROJECT_DIR/config/runtime.env"
 fi
 ROS_DISTRO="${ROS_DISTRO:-humble}"
-MCU_DEVICE="${MCU_DEVICE:-/dev/ttyUSB_mcu}"
+MCU_DEVICE="${MCU_DEVICE:-/dev/ttyTHS1}"
 LIDAR_DEVICE="${LIDAR_DEVICE:-/dev/ttyUSB_lidar}"
 errors=0
 
