@@ -11,7 +11,9 @@ sudo apt install -y python3-colcon-common-extensions python3-rosdep python3-pip 
   "ros-$ROS_DISTRO-robot-localization" "ros-$ROS_DISTRO-slam-toolbox" \
   "ros-$ROS_DISTRO-navigation2" "ros-$ROS_DISTRO-nav2-bringup" \
   "ros-$ROS_DISTRO-robot-state-publisher" "ros-$ROS_DISTRO-xacro"
+set +u
 source "/opt/ros/$ROS_DISTRO/setup.bash"
+set -u
 if ! python3 -c 'import torch, ultralytics; assert torch.cuda.is_available()' 2>/dev/null; then
   echo "[주의] JetPack용 CUDA PyTorch/Ultralytics가 확인되지 않아 YOLO는 실행되지 않을 수 있습니다."
   echo "일반 pip torch는 CUDA를 손상시킬 수 있어 자동 설치하지 않습니다."
