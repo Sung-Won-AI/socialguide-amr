@@ -1,0 +1,4 @@
+FROM ultralytics/ultralytics:latest-jetson-jetpack6
+RUN python3 -m pip install --no-cache-dir depthai
+COPY docker/oak_yolo_udp.py /opt/amr/oak_yolo_udp.py
+ENTRYPOINT ["python3", "/opt/amr/oak_yolo_udp.py"]
