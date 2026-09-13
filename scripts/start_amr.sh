@@ -22,11 +22,15 @@ PID_FILE="$RUN_DIR/amr.pids"
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 : > "$PID_FILE"
 
+# ROS-generated setup files may read optional variables before defining them.
+# Temporarily disable nounset while sourcing, then restore strict mode.
+set +u
 source "/opt/ros/$ROS_DISTRO/setup.bash"
 source "$PROJECT_DIR/jetson_ws/install/setup.bash"
 if [[ -n "${LIDAR_SETUP_FILE:-}" && -f "$LIDAR_SETUP_FILE" ]]; then
   source "$LIDAR_SETUP_FILE"
 fi
+set -u
 export PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 "$PROJECT_DIR/scripts/preflight_amr.sh"
 
