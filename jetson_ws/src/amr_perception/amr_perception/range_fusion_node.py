@@ -31,6 +31,12 @@ class RangeFusionNode(Node):
         self.create_subscription(
             LaserScan, "/scan", self._on_scan, qos_profile_sensor_data
         )
+        self.create_subscription(
+            ObstacleInfo,
+            "/vision/person_obstacle",
+            self._on_person_obstacle,
+            10,
+        )
         rate = float(self.get_parameter("publish_rate_hz").value)
         self.create_timer(1.0 / rate, self._publish)
 
@@ -66,12 +72,19 @@ class RangeFusionNode(Node):
         if distance is not None:
             self.fusion.update(RangeReading("lidar_front", distance, self.now_s()))
 
+    def _on_person_obstacle(self, message: ObstacleInfo) -> None:
+        if message.valid and message.detected and math.isfinite(message.distance_m):
+            self.fusion.update(
+                RangeReading("camera_person", float(message.distance_m), self.now_s())
+            )
+
     def _publish(self) -> None:
         result = self.fusion.result(self.now_s())
         message = ObstacleInfo()
         message.stamp = self.get_clock().now().to_msg()
         message.detected = result.valid
-        message.object_class = result.source if result.valid else "none"
+        labels = {"camera_person": "사람"}
+        message.object_class = labels.get(result.source, result.source) if result.valid else "none"
         message.distance_m = float(result.distance_m if result.valid else 10.0)
         message.closing_speed_mps = float(result.closing_speed_mps)
         message.ttc_s = (
