@@ -19,7 +19,10 @@ if ! python3 -c 'import torch, ultralytics; assert torch.cuda.is_available()' 2>
   echo "일반 pip torch는 CUDA를 손상시킬 수 있어 자동 설치하지 않습니다."
 fi
 cd "$PROJECT_DIR"
-python3 -m pip install --user -e .
+# Ubuntu 22.04의 기본 pip/build backend는 PEP 660 editable 설치를 지원하지
+# 않을 수 있다. 실행 시에는 start_amr.sh가 저장소를 PYTHONPATH에 추가하므로
+# 코어 패키지는 일반 사용자 설치로 충분하다.
+python3 -m pip install --user .
 cd "$PROJECT_DIR/jetson_ws"
 rosdep install --from-paths src --ignore-src -r -y || true
 colcon build --symlink-install
