@@ -21,15 +21,17 @@ class SpeechItem:
 
 
 class SpeechWorker:
-    def __init__(self, command: str, voice: str, speed_wpm: int) -> None:
+    def __init__(self, command: str, voice: str, speed_wpm: int, output_device: str) -> None:
         self.command = command
         self.voice = voice
         self.speed_wpm = speed_wpm
+        self.output_device = output_device
         self._queue: list[SpeechItem] = []
         self._condition = threading.Condition()
         self._sequence = 0
         self._stopping = False
         self._process: subprocess.Popen | None = None
+        self._synth_process: subprocess.Popen | None = None
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -39,6 +41,8 @@ class SpeechWorker:
             heapq.heappush(self._queue, SpeechItem(-priority, self._sequence, key, text))
             if interrupt and self._process is not None and self._process.poll() is None:
                 self._process.terminate()
+                if self._synth_process is not None and self._synth_process.poll() is None:
+                    self._synth_process.terminate()
             self._condition.notify()
 
     def _run(self) -> None:
@@ -50,30 +54,44 @@ class SpeechWorker:
                     return
                 item = heapq.heappop(self._queue)
             try:
-                self._process = subprocess.Popen(
-                    [
-                        self.command,
-                        "-v",
-                        self.voice,
-                        "-s",
-                        str(self.speed_wpm),
-                        item.text,
-                    ],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+                command = [self.command, "-v", self.voice, "-s", str(self.speed_wpm)]
+                if self.output_device:
+                    self._synth_process = subprocess.Popen(
+                        command + ["--stdout", item.text],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    self._process = subprocess.Popen(
+                        ["aplay", "-q", "-D", self.output_device],
+                        stdin=self._synth_process.stdout,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    if self._synth_process.stdout is not None:
+                        self._synth_process.stdout.close()
+                else:
+                    self._process = subprocess.Popen(
+                        command + [item.text],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
                 self._process.wait()
+                if self._synth_process is not None:
+                    self._synth_process.wait()
             except OSError:
                 # Audio failure must never block or alter vehicle safety control.
                 time.sleep(0.1)
             finally:
                 self._process = None
+                self._synth_process = None
 
     def close(self) -> None:
         with self._condition:
             self._stopping = True
             if self._process is not None and self._process.poll() is None:
                 self._process.terminate()
+            if self._synth_process is not None and self._synth_process.poll() is None:
+                self._synth_process.terminate()
             self._condition.notify_all()
         self._thread.join(timeout=1.0)
 
@@ -84,6 +102,7 @@ class AudioNode(Node):
         self.declare_parameter("enabled", True)
         self.declare_parameter("tts_command", "espeak-ng")
         self.declare_parameter("voice", "ko")
+        self.declare_parameter("output_device", "plughw:CARD=UACDemoV10,DEV=0")
         self.declare_parameter("speed_wpm", 145)
         self.declare_parameter("repeat_interval_s", 4.0)
         self.declare_parameter("obstacle_announce_distance_m", 2.0)
@@ -91,6 +110,7 @@ class AudioNode(Node):
             str(self.get_parameter("tts_command").value),
             str(self.get_parameter("voice").value),
             int(self.get_parameter("speed_wpm").value),
+            str(self.get_parameter("output_device").value),
         )
         self.last_announced: dict[str, float] = {}
         self.previous_state: int | None = None
