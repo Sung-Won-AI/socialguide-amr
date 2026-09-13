@@ -17,3 +17,9 @@ bool push_switch_pressed
 int16 requested_base_rpm
 int16 left_velocity_rpm
 int16 right_velocity_rpm
+int16 left_target_rpm
+int16 right_target_rpm
+uint32 sharp_adc
+uint32 left_pwm
+uint32 right_pwm
+bool emergency_stop
