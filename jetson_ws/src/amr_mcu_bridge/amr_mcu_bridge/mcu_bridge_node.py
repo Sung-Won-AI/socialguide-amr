@@ -7,8 +7,7 @@ from sensor_msgs.msg import Range
 from std_msgs.msg import Bool, Float32
 
 from amr_interfaces.msg import McuStatus, SafetyState
-from jetson.amr_core.packet import WheelCommand
-from jetson.amr_core.serial_bridge import SerialBridge
+from jetson.amr_core.ascii_serial_bridge import AsciiSerialBridge
 from jetson.amr_core.transport import SerialTransport
 from jetson.amr_core.wheel_kinematics import twist_to_wheel_rpm
 from protocol.protocol_constants import DriveControlFlag, SystemState
@@ -17,22 +16,26 @@ from protocol.protocol_constants import DriveControlFlag, SystemState
 class McuBridgeNode(Node):
     def __init__(self) -> None:
         super().__init__("mcu_bridge_node")
-        self.declare_parameter("port", "/dev/ttyUSB_mcu")
+        self.declare_parameter("port", "/dev/ttyTHS1")
         self.declare_parameter("baudrate", 115200)
-        self.declare_parameter("command_rate_hz", 20.0)
+        self.declare_parameter("command_rate_hz", 10.0)
         self.declare_parameter("status_timeout_s", 0.35)
-        self.declare_parameter("maximum_speed_mps", 0.5)
+        self.declare_parameter("velocity_input_timeout_s", 0.25)
+        self.declare_parameter("safety_input_timeout_s", 0.35)
+        self.declare_parameter("maximum_speed_mps", 0.03)
         self.declare_parameter("wheel_diameter_m", 0.20)
         self.declare_parameter("wheel_base_m", 0.50)
-        self.declare_parameter("maximum_wheel_rpm", 300)
+        self.declare_parameter("maximum_wheel_rpm", 3)
         self.declare_parameter("left_trim_rpm", 0)
         self.declare_parameter("right_trim_rpm", 0)
+        self.declare_parameter("left_scale", 1.0)
+        self.declare_parameter("right_scale", 1.0)
         self.declare_parameter("switch_mode", "hold")
         transport = SerialTransport(
             str(self.get_parameter("port").value),
             baudrate=int(self.get_parameter("baudrate").value),
         )
-        self.bridge = SerialBridge(
+        self.bridge = AsciiSerialBridge(
             transport,
             status_timeout_s=float(self.get_parameter("status_timeout_s").value),
         )
@@ -42,6 +45,8 @@ class McuBridgeNode(Node):
         self.drive_requested = False
         self.previous_switch = False
         self.reset_requested = False
+        self.velocity_stamp_s: float | None = None
+        self.safety_stamp_s: float | None = None
         self.publisher = self.create_publisher(McuStatus, "/mcu/status", 10)
         self.ultrasonic_pub = self.create_publisher(Range, "/ultrasonic/front", 10)
         self.sharp_left_pub = self.create_publisher(Range, "/sharp/left", 10)
@@ -56,17 +61,36 @@ class McuBridgeNode(Node):
 
     def _on_velocity(self, message: Twist) -> None:
         self.velocity = message
+        self.velocity_stamp_s = self._now_s()
 
     def _on_safety(self, message: SafetyState) -> None:
         self.safety = message
+        self.safety_stamp_s = self._now_s()
 
     def _on_reset(self, message: Bool) -> None:
         self.reset_requested = bool(message.data)
 
-    def _wheel_command(self) -> WheelCommand:
+    def _now_s(self) -> float:
+        return self.get_clock().now().nanoseconds / 1_000_000_000.0
+
+    def _wheel_command(self) -> tuple[int, int, bool]:
         self.command_id = (self.command_id + 1) & 0xFFFF
         flags = DriveControlFlag.NONE
-        state = SystemState.INIT if self.safety is None else SystemState(int(self.safety.state))
+        now = self._now_s()
+        safety_fresh = (
+            self.safety is not None
+            and self.safety_stamp_s is not None
+            and now - self.safety_stamp_s
+            <= float(self.get_parameter("safety_input_timeout_s").value)
+        )
+        velocity_fresh = (
+            self.velocity_stamp_s is not None
+            and now - self.velocity_stamp_s
+            <= float(self.get_parameter("velocity_input_timeout_s").value)
+        )
+        state = (
+            SystemState(int(self.safety.state)) if safety_fresh else SystemState.INIT
+        )
         if state in (SystemState.RUN, SystemState.SLOW):
             flags |= DriveControlFlag.DRIVE_ENABLE
         if state == SystemState.SLOW:
@@ -75,7 +99,9 @@ class McuBridgeNode(Node):
             flags |= DriveControlFlag.CONTROLLED_STOP
         if self.reset_requested:
             flags |= DriveControlFlag.RESET_REQUEST
-        enabled = bool(flags & DriveControlFlag.DRIVE_ENABLE)
+        enabled = bool(flags & DriveControlFlag.DRIVE_ENABLE) and velocity_fresh
+        if not velocity_fresh:
+            flags &= ~DriveControlFlag.DRIVE_ENABLE
         diameter = float(self.get_parameter("wheel_diameter_m").value)
         wheel_base = float(self.get_parameter("wheel_base_m").value)
         linear = float(self.velocity.linear.x) if enabled else 0.0
@@ -91,17 +117,22 @@ class McuBridgeNode(Node):
             right_trim_rpm=int(self.get_parameter("right_trim_rpm").value),
         )
         emergency = int(state in (SystemState.EMERGENCY_STOP, SystemState.FAULT))
-        return WheelCommand(
-            command_id=self.command_id,
-            left_target_rpm=left_rpm if enabled else 0,
-            right_target_rpm=right_rpm if enabled else 0,
-            control_flags=int(flags),
-            emergency=emergency,
-        )
+        if enabled:
+            left_rpm = round(left_rpm * float(self.get_parameter("left_scale").value))
+            right_rpm = round(
+                right_rpm * float(self.get_parameter("right_scale").value)
+            )
+            left_rpm = max(-limit, min(limit, left_rpm))
+            right_rpm = max(-limit, min(limit, right_rpm))
+        else:
+            left_rpm = 0
+            right_rpm = 0
+        return left_rpm, right_rpm, bool(emergency)
 
     def _tick(self) -> None:
         try:
-            self.bridge.send_wheel_command(self._wheel_command())
+            left_rpm, right_rpm, emergency = self._wheel_command()
+            self.bridge.send_wheel_command(left_rpm, right_rpm, emergency)
             self.reset_requested = False
             statuses = self.bridge.poll()
         except (OSError, RuntimeError, ValueError) as error:
@@ -112,49 +143,43 @@ class McuBridgeNode(Node):
             status = statuses[-1]
             message = McuStatus()
             message.stamp = self.get_clock().now().to_msg()
-            message.system_state = int(status.system_state)
-            message.safety_flags = int(status.safety_flags)
-            message.left_velocity_mps = status.left_velocity_mm_s / 1000.0
-            message.right_velocity_mps = status.right_velocity_mm_s / 1000.0
-            message.battery_voltage_v = status.battery_voltage_mv / 1000.0
-            message.motor_error = status.motor_error
-            message.last_command_id = status.last_command_id
-            message.rx_error_count = status.rx_error_count
-            message.uptime_ms = status.uptime_ms
+            message.system_state = int(
+                SystemState.EMERGENCY_STOP if status.emergency else SystemState.RUN
+            )
+            message.safety_flags = 0
+            diameter = float(self.get_parameter("wheel_diameter_m").value)
+            circumference = math.pi * diameter
+            message.left_velocity_mps = status.left_rpm * circumference / 60.0
+            message.right_velocity_mps = status.right_rpm * circumference / 60.0
+            message.battery_voltage_v = 0.0
+            message.motor_error = 0
+            message.last_command_id = self.command_id
+            message.rx_error_count = diagnostics.ignored_packets
+            message.uptime_ms = 0
             message.connected = not diagnostics.status_timed_out
             message.dummy = False
-            message.ultrasonic_front_m = self._meters(status.ultrasonic_front_mm)
-            message.sharp_left_m = self._meters(status.sharp_left_mm)
-            message.sharp_right_m = self._meters(status.sharp_right_mm)
-            message.push_switch_pressed = bool(status.push_switch_pressed)
-            message.requested_base_rpm = status.requested_base_rpm
-            message.left_velocity_rpm = status.left_velocity_rpm
-            message.right_velocity_rpm = status.right_velocity_rpm
+            message.ultrasonic_front_m = float("nan")
+            message.sharp_left_m = status.sharp_distance_cm / 100.0
+            message.sharp_right_m = float("nan")
+            message.push_switch_pressed = status.base_rpm > 0
+            message.requested_base_rpm = status.base_rpm
+            message.left_velocity_rpm = status.left_rpm
+            message.right_velocity_rpm = status.right_rpm
+            message.left_target_rpm = status.left_target_rpm
+            message.right_target_rpm = status.right_target_rpm
+            message.sharp_adc = status.sharp_adc
+            message.left_pwm = status.left_pwm
+            message.right_pwm = status.right_pwm
+            message.emergency_stop = status.emergency
             self.publisher.publish(message)
             self._update_drive_request(
-                bool(status.push_switch_pressed), status.requested_base_rpm
-            )
-            self._publish_range(
-                self.ultrasonic_pub,
-                "ultrasonic_front_link",
-                Range.ULTRASOUND,
-                status.ultrasonic_front_mm,
-                0.02,
-                4.0,
+                status.base_rpm > 0, status.base_rpm
             )
             self._publish_range(
                 self.sharp_left_pub,
                 "sharp_left_link",
                 Range.INFRARED,
-                status.sharp_left_mm,
-                0.04,
-                1.5,
-            )
-            self._publish_range(
-                self.sharp_right_pub,
-                "sharp_right_link",
-                Range.INFRARED,
-                status.sharp_right_mm,
+                status.sharp_distance_cm * 10,
                 0.04,
                 1.5,
             )
