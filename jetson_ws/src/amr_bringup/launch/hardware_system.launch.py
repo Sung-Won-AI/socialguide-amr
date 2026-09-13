@@ -30,7 +30,7 @@ def generate_launch_description():
             ),
             Node(
                 package="amr_vision",
-                executable="yolo_node",
+                executable="yolo_udp_bridge_node",
                 parameters=[yolo_config],
                 output="screen",
             ),
