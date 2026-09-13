@@ -7,6 +7,8 @@ RUNTIME_FILE="$PROJECT_DIR/config/runtime.env"
 ROS_DISTRO="${ROS_DISTRO:-humble}"
 OAK_LAUNCH_PACKAGE="${OAK_LAUNCH_PACKAGE:-depthai_ros_driver}"
 OAK_LAUNCH_FILE="${OAK_LAUNCH_FILE:-camera.launch.py}"
+VISION_MODE="${VISION_MODE:-docker}"
+YOLO_WEB_URL="${YOLO_WEB_URL:-http://127.0.0.1:8081}"
 LIDAR_LAUNCH_PACKAGE="${LIDAR_LAUNCH_PACKAGE:-ldlidar_stl_ros2}"
 LIDAR_LAUNCH_FILE="${LIDAR_LAUNCH_FILE:-stl27l.launch.py}"
 MCU_DEVICE="${MCU_DEVICE:-/dev/ttyTHS1}"
@@ -51,12 +53,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-start_process oak_driver ros2 launch "$OAK_LAUNCH_PACKAGE" "$OAK_LAUNCH_FILE"
+if [[ "$VISION_MODE" == "docker" ]]; then
+  start_process yolo_docker "$PROJECT_DIR/scripts/start_yolo_docker.sh"
+else
+  start_process oak_driver ros2 launch "$OAK_LAUNCH_PACKAGE" "$OAK_LAUNCH_FILE"
+fi
 start_process lidar_driver ros2 launch "$LIDAR_LAUNCH_PACKAGE" "$LIDAR_LAUNCH_FILE" "$LIDAR_PORT_ARGUMENT:=$LIDAR_DEVICE"
 start_process amr_core ros2 launch amr_bringup hardware_system.launch.py "mcu_port:=$MCU_DEVICE"
 
 sleep 5
-for topic in /oak/rgb/image_raw /scan /mcu/status /safety/state; do
+for topic in /yolo/detections /scan /mcu/status /safety/state; do
   if timeout 3 ros2 topic echo "$topic" --once >/dev/null 2>&1; then
     echo "[ OK ] 토픽 수신: $topic"
   else
@@ -65,7 +71,7 @@ for topic in /oak/rgb/image_raw /scan /mcu/status /safety/state; do
 done
 
 if [[ "$OPEN_GUI" == "1" && -n "${DISPLAY:-}" ]]; then
-  [[ "$OPEN_YOLO_WINDOW" == "1" ]] && start_process yolo_view rqt_image_view /yolo/annotated_image
+  [[ "$OPEN_YOLO_WINDOW" == "1" ]] && start_process yolo_view xdg-open "$YOLO_WEB_URL"
   [[ "$OPEN_RVIZ" == "1" ]] && start_process lidar_rviz rviz2 -d "$PROJECT_DIR/config/amr_lidar.rviz"
   [[ "$OPEN_DASHBOARD" == "1" ]] && start_process dashboard xdg-open http://127.0.0.1:8080
 else
