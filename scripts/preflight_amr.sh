@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -u
+set -o pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ -f "$PROJECT_DIR/config/runtime.env" ]]; then
