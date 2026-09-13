@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -Eeo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_FILE="$PROJECT_DIR/config/runtime.env"
@@ -22,15 +22,14 @@ PID_FILE="$RUN_DIR/amr.pids"
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 : > "$PID_FILE"
 
-# ROS-generated setup files may read optional variables before defining them.
-# Temporarily disable nounset while sourcing, then restore strict mode.
-set +u
+# ROS-generated setup files read these optional variables during initialization.
+export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"
+export AMENT_PYTHON_EXECUTABLE="${AMENT_PYTHON_EXECUTABLE:-/usr/bin/python3}"
 source "/opt/ros/$ROS_DISTRO/setup.bash"
 source "$PROJECT_DIR/jetson_ws/install/setup.bash"
 if [[ -n "${LIDAR_SETUP_FILE:-}" && -f "$LIDAR_SETUP_FILE" ]]; then
   source "$LIDAR_SETUP_FILE"
 fi
-set -u
 export PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 "$PROJECT_DIR/scripts/preflight_amr.sh"
 
