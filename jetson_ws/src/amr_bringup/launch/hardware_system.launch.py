@@ -20,7 +20,7 @@ def generate_launch_description():
     )
     return LaunchDescription(
         [
-            DeclareLaunchArgument("mcu_port", default_value="/dev/ttyUSB_mcu"),
+            DeclareLaunchArgument("mcu_port", default_value="/dev/ttyTHS1"),
             LogInfo(
                 msg="Hardware mode starts perception, MCU, safety and audio nodes; external OAK-D, STL-27L and cliff drivers are required. Motor enable remains false until commissioning."
             ),
