@@ -18,7 +18,8 @@ OPEN_GUI="${OPEN_GUI:-1}"
 OPEN_YOLO_WINDOW="${OPEN_YOLO_WINDOW:-1}"
 OPEN_RVIZ="${OPEN_RVIZ:-1}"
 OPEN_DASHBOARD="${OPEN_DASHBOARD:-1}"
-STARTUP_TIMEOUT_S="${STARTUP_TIMEOUT_S:-30}"
+STARTUP_TIMEOUT_S="${STARTUP_TIMEOUT_S:-60}"
+TOPIC_PROBE_TIMEOUT_S="${TOPIC_PROBE_TIMEOUT_S:-8}"
 RUN_DIR="$PROJECT_DIR/.run"
 LOG_DIR="$PROJECT_DIR/logs/runtime"
 PID_FILE="$RUN_DIR/amr.pids"
@@ -107,7 +108,7 @@ while (( SECONDS < startup_deadline )); do
       continue
     fi
     all_topics_ready=0
-    if timeout 2 ros2 topic echo "$topic" --once >/dev/null 2>&1; then
+    if timeout "$TOPIC_PROBE_TIMEOUT_S" ros2 topic echo "$topic" --once >/dev/null 2>&1; then
       topic_ready["$topic"]=1
       echo "[ OK ] 토픽 수신: $topic"
     fi
