@@ -1,4 +1,5 @@
 import json
+from http.client import RemoteDisconnected
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -80,7 +81,7 @@ class MonitoringAdapterNode(Node):
                 if response.status != 200:
                     raise URLError(f"HTTP {response.status}")
             self.failure_reported = False
-        except (URLError, TimeoutError) as exc:
+        except (URLError, TimeoutError, RemoteDisconnected, OSError) as exc:
             if not self.failure_reported:
                 self.get_logger().warning(f"monitoring API unavailable: {exc}")
                 self.failure_reported = True
