@@ -21,8 +21,19 @@ OPEN_DASHBOARD="${OPEN_DASHBOARD:-1}"
 RUN_DIR="$PROJECT_DIR/.run"
 LOG_DIR="$PROJECT_DIR/logs/runtime"
 PID_FILE="$RUN_DIR/amr.pids"
+CONTROLLER_FILE="$RUN_DIR/amr.controller.pid"
 mkdir -p "$RUN_DIR" "$LOG_DIR"
-: > "$PID_FILE"
+
+if [[ -f "$CONTROLLER_FILE" ]]; then
+  read -r old_controller < "$CONTROLLER_FILE" || true
+  if [[ "${old_controller:-}" =~ ^[0-9]+$ ]] && kill -0 "$old_controller" 2>/dev/null; then
+    echo "[FAIL] AMR가 이미 실행 중입니다 (controller PID: $old_controller)."
+    echo "       먼저 $PROJECT_DIR/scripts/stop_amr.sh 를 실행하세요."
+    exit 1
+  fi
+  echo "[WARN] 오래된 실행 정보 파일을 정리합니다."
+  rm -f "$CONTROLLER_FILE" "$PID_FILE"
+fi
 
 # ROS-generated setup files read these optional variables during initialization.
 export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"
@@ -35,21 +46,43 @@ fi
 export PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 "$PROJECT_DIR/scripts/preflight_amr.sh"
 
+echo "$$" > "$CONTROLLER_FILE"
+: > "$PID_FILE"
+
 start_process() {
   local name="$1"; shift
   echo "[START] $name"
-  "$@" >"$LOG_DIR/$name.log" 2>&1 &
+  # Give each component its own process group so ROS launch children are also
+  # stopped, including the dashboard HTTP server.
+  setsid "$@" >"$LOG_DIR/$name.log" 2>&1 &
   echo "$! $name" >> "$PID_FILE"
 }
 
+cleanup_done=0
 cleanup() {
+  local pid name
+  (( cleanup_done == 0 )) || return 0
+  cleanup_done=1
+  trap - EXIT INT TERM
   echo "AMR 프로세스를 종료합니다."
   if [[ -f "$PID_FILE" ]]; then
     while read -r pid name; do
-      if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null || true; fi
+      if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+        echo "[STOP] $name ($pid)"
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+      fi
+    done < "$PID_FILE"
+
+    sleep 2
+    while read -r pid name; do
+      if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+        echo "[KILL] 종료되지 않은 $name ($pid)"
+        kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+      fi
     done < "$PID_FILE"
   fi
-  rm -f "$PID_FILE"
+  docker stop -t 2 socialguide-amr-yolo >/dev/null 2>&1 || true
+  rm -f "$PID_FILE" "$CONTROLLER_FILE"
 }
 trap cleanup EXIT INT TERM
 
@@ -71,12 +104,13 @@ for topic in /yolo/detections /scan /mcu/status /safety/state; do
 done
 
 if [[ "$OPEN_GUI" == "1" && -n "${DISPLAY:-}" ]]; then
-  [[ "$OPEN_YOLO_WINDOW" == "1" ]] && start_process yolo_view xdg-open "$YOLO_WEB_URL"
+  [[ "$OPEN_YOLO_WINDOW" == "1" ]] && xdg-open "$YOLO_WEB_URL" >/dev/null 2>&1 || true
   [[ "$OPEN_RVIZ" == "1" ]] && start_process lidar_rviz rviz2 -d "$PROJECT_DIR/config/amr_lidar.rviz"
-  [[ "$OPEN_DASHBOARD" == "1" ]] && start_process dashboard xdg-open http://127.0.0.1:8080
+  [[ "$OPEN_DASHBOARD" == "1" ]] && xdg-open http://127.0.0.1:8080 >/dev/null 2>&1 || true
 else
   echo "GUI를 열지 않습니다. 관제 주소: http://127.0.0.1:8080"
 fi
 
 echo "AMR가 READY 상태로 실행되었습니다. 실제 주행은 안전 조건 확인 후 푸시스위치로 허용됩니다."
+echo "종료 명령: $PROJECT_DIR/scripts/stop_amr.sh"
 wait
