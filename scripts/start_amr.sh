@@ -18,6 +18,7 @@ OPEN_GUI="${OPEN_GUI:-1}"
 OPEN_YOLO_WINDOW="${OPEN_YOLO_WINDOW:-1}"
 OPEN_RVIZ="${OPEN_RVIZ:-1}"
 OPEN_DASHBOARD="${OPEN_DASHBOARD:-1}"
+STARTUP_TIMEOUT_S="${STARTUP_TIMEOUT_S:-30}"
 RUN_DIR="$PROJECT_DIR/.run"
 LOG_DIR="$PROJECT_DIR/logs/runtime"
 PID_FILE="$RUN_DIR/amr.pids"
@@ -94,14 +95,45 @@ fi
 start_process lidar_driver ros2 launch "$LIDAR_LAUNCH_PACKAGE" "$LIDAR_LAUNCH_FILE" "$LIDAR_PORT_ARGUMENT:=$LIDAR_DEVICE"
 start_process amr_core ros2 launch amr_bringup hardware_system.launch.py "mcu_port:=$MCU_DEVICE"
 
-sleep 5
-for topic in /yolo/detections /scan /mcu/status /safety/state; do
-  if timeout 3 ros2 topic echo "$topic" --once >/dev/null 2>&1; then
-    echo "[ OK ] 토픽 수신: $topic"
-  else
-    echo "[WARN] 토픽 미수신: $topic (관련 로그를 확인하세요)"
+echo "[WAIT] 센서와 ROS 노드 준비 대기 (최대 ${STARTUP_TIMEOUT_S}초)"
+topics=(/yolo/detections /scan /mcu/status /safety/state)
+declare -A topic_ready=()
+startup_deadline=$((SECONDS + STARTUP_TIMEOUT_S))
+
+while (( SECONDS < startup_deadline )); do
+  all_topics_ready=1
+  for topic in "${topics[@]}"; do
+    if [[ "${topic_ready[$topic]:-0}" == "1" ]]; then
+      continue
+    fi
+    all_topics_ready=0
+    if timeout 2 ros2 topic echo "$topic" --once >/dev/null 2>&1; then
+      topic_ready["$topic"]=1
+      echo "[ OK ] 토픽 수신: $topic"
+    fi
+  done
+  (( all_topics_ready == 0 )) || break
+  sleep 1
+done
+
+topic_failures=0
+for topic in "${topics[@]}"; do
+  if [[ "${topic_ready[$topic]:-0}" != "1" ]]; then
+    echo "[WARN] 시작 제한시간 내 토픽 미수신: $topic"
+    topic_failures=$((topic_failures + 1))
   fi
 done
+
+mcu_connected=0
+if [[ "${topic_ready[/mcu/status]:-0}" == "1" ]]; then
+  if timeout 3 ros2 topic echo /mcu/status --once --field connected 2>/dev/null | grep -q '^true$'; then
+    mcu_connected=1
+    echo "[ OK ] STM32 STATUS 통신 연결"
+  else
+    echo "[WARN] /mcu/status 토픽은 수신되지만 STM32 STATUS 데이터가 없습니다."
+    echo "       STM32 전원, 펌웨어 및 UART 송신을 확인하세요. 모터는 활성화하지 않습니다."
+  fi
+fi
 
 if [[ "$OPEN_GUI" == "1" && -n "${DISPLAY:-}" ]]; then
   [[ "$OPEN_YOLO_WINDOW" == "1" ]] && xdg-open "$YOLO_WEB_URL" >/dev/null 2>&1 || true
@@ -111,6 +143,10 @@ else
   echo "GUI를 열지 않습니다. 관제 주소: http://127.0.0.1:8080"
 fi
 
-echo "AMR가 READY 상태로 실행되었습니다. 실제 주행은 안전 조건 확인 후 푸시스위치로 허용됩니다."
+if (( topic_failures == 0 && mcu_connected == 1 )); then
+  echo "AMR가 READY 상태로 실행되었습니다. 실제 주행은 안전 조건 확인 후 푸시스위치로 허용됩니다."
+else
+  echo "AMR가 DEGRADED 상태로 실행되었습니다. 위 경고를 해결하기 전에는 주행하지 마세요."
+fi
 echo "종료 명령: $PROJECT_DIR/scripts/stop_amr.sh"
 wait
