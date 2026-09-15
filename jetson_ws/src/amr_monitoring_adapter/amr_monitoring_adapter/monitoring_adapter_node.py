@@ -40,6 +40,9 @@ class MonitoringAdapterNode(Node):
         self.create_subscription(BatteryState, "/battery/state", lambda m: setattr(self, "battery", m), 10)
         self.create_subscription(Bool, "/dummy/active", self._on_dummy, 10)
         self.create_subscription(String, "/dummy/scenario_name", self._on_scenario, 10)
+        # Docker vision mode publishes detection heartbeats instead of a ROS image.
+        self.create_subscription(String, "/yolo/detections", self._on_camera, 10)
+        # Keep compatibility with the older native ROS YOLO node.
         self.create_subscription(Image, "/yolo/annotated_image", self._on_camera, 2)
         self.create_subscription(LaserScan, "/scan", self._on_lidar, 2)
         self.timer = self.create_timer(1.0 / rate, self._publish)
@@ -50,7 +53,7 @@ class MonitoringAdapterNode(Node):
     def _on_scenario(self, message: String) -> None:
         self.scenario_name = message.data
 
-    def _on_camera(self, _message: Image) -> None:
+    def _on_camera(self, _message) -> None:
         self.camera_seen_ns = self.get_clock().now().nanoseconds
 
     def _on_lidar(self, _message: LaserScan) -> None:
