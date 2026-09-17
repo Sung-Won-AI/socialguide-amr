@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -Eeo pipefail
 
+on_error() {
+    local exit_code=$?
+    echo "[FAIL] 실행 스크립트 오류"
+    echo "       line=$1 exit=$exit_code"
+    echo "       command=$2"
+}
+trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROS_SETUP="/opt/ros/humble/setup.bash"
 JETSON_SETUP="$PROJECT_DIR/jetson_ws/install/setup.bash"
